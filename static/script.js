@@ -10,7 +10,8 @@ let selectedUserId = null;
 let pollInterval = null;
 let currentRequestId = null;
 let isLive = false;
-
+let locationReady = false;
+  
 // ==========================
 // INIT
 // ==========================
@@ -37,25 +38,26 @@ function initMap() {
   }
 
   navigator.geolocation.getCurrentPosition(
-    pos => {
-      myLat = pos.coords.latitude;
-      myLon = pos.coords.longitude;
+  pos => {
+    myLat = pos.coords.latitude;
+    myLon = pos.coords.longitude;
+    locationReady = true;
 
-      map.setView([myLat, myLon], 14);
+    map.setView([myLat, myLon], 14);
 
-      userMarker = L.circleMarker([myLat, myLon], {
-        radius: 8,
-        fillColor: "#3bb2d0",
-        color: "#fff",
-        weight: 2,
-        fillOpacity: 1
-      }).addTo(map);
+    userMarker = L.circleMarker([myLat, myLon], {
+      radius: 8,
+      fillColor: "#3bb2d0",
+      color: "#fff",
+      weight: 2,
+      fillOpacity: 1
+    }).addTo(map);
 
-      fetchNearbyUsers();
-      setInterval(fetchNearbyUsers, 10000); // refresh map
-    },
-    () => alert("Location permission required")
-  );
+    fetchNearbyUsers();
+  },
+  () => alert("Location permission required")
+);
+
 }
 
 // ==========================
