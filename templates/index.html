@@ -27,32 +27,69 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
   <style>
-    /* USER AVATAR – TOP LEFT */
-      .user-avatar {
-        position: fixed;
-        top: 12px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 9999;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background: rgba(0,0,0,0.6);
-        backdrop-filter: blur(8px);
-        border: 2px solid #FFD700;
-        box-shadow: 0 0 12px rgba(255,215,0,0.4);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-      }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* MAP MUST HAVE HEIGHT */
+    #map {
+      height: 100vh;
+      width: 100%;
+      z-index: 1;
+    }
+
+    /* USER AVATAR */
+    .user-avatar {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      border: 2px solid #FFD700;
+      box-shadow: 0 0 12px rgba(255,215,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
 
     .user-avatar img {
       width: 100%;
       height: 100%;
       border-radius: 50%;
       object-fit: cover;
-      pointer-events: none;
+    }
+
+    /* BELL ICON */
+    .bell-icon {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      font-size: 22px;
+      cursor: pointer;
+      z-index: 9999;
+    }
+
+    .bell-icon span {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 8px;
+      height: 8px;
+      background: red;
+      border-radius: 50%;
+    }
+
+    .hidden {
+      display: none;
     }
   </style>
 </head>
@@ -62,6 +99,12 @@
   <!-- USER AVATAR -->
   <div class="user-avatar" onclick="goToSettings()" title="{{ user.username }}">
     <img src="{{ user.avatar_url }}" alt="{{ user.username }}">
+  </div>
+
+  <!-- BELL -->
+  <div class="bell-icon" onclick="openRequests()">
+    🔔
+    <span id="bell-dot" class="hidden"></span>
   </div>
 
   <!-- MAP -->
@@ -120,16 +163,17 @@
       </div>
 
       <div class="input-group">
-        <input id="visual-clue" placeholder="Visual clue (e.g. red jacket, blue hat)">
+        <input id="visual-clue" placeholder="Visual clue (e.g. red jacket)">
       </div>
 
       <div class="action-row">
         <button class="secondary-btn" onclick="closeAllSheets()">Cancel</button>
         <button class="primary-btn" onclick="confirmCheckIn()">Go Live</button>
       </div>
+    </div>
+  </div>
 
-
-  <!-- PROFILE / REQUEST SHEET -->
+  <!-- PROFILE SHEET -->
   <div id="profile-sheet" class="bottom-sheet">
     <div class="sheet-handle"></div>
 
@@ -164,10 +208,6 @@
   <!-- SCRIPTS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="{{ url_for('static', filename='script.js') }}"></script>
-<div class="bell-icon" onclick="openRequests()">
-  🔔
-  <span id="bell-dot" class="hidden"></span>
-</div>
 
 </body>
 </html>
