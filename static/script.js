@@ -263,6 +263,7 @@ function startTimer() {
     if (timeLeft < 0) clearInterval(timer);
   }, 1000);
 }
+console.log("Nearby API response:", users);
 
 // ==========================
 // UI HELPERS
