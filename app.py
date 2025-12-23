@@ -215,6 +215,15 @@ def nearby():
             })
 
     return jsonify(result)
+@app.route("/api/checkin", methods=["POST"])
+def checkin():
+    if "user_id" not in session:
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.json
+    user_id = session["user_id"]
+
+    print("CHECKIN:", user_id, data["lat"], data["lon"])  # 👈 ADD THIS
 
 # ----------------------------
 # RUN (LOCAL ONLY)
