@@ -102,7 +102,7 @@ async function fetchNearbyUsers() {
   nearbyMarkers.forEach(m => map.removeLayer(m));
   nearbyMarkers = [];
 
-  users.forEach(user => {
+  data.forEach(user => {
     const ring = document.createElement('div');
     ring.style.width = '60px';
     ring.style.height = '60px';
@@ -348,3 +348,4 @@ async function respondRequest(action, requestId) {
   document.getElementById("bellIcon").classList.remove("pulse");
   document.getElementById("bellBox").classList.add("hidden");
 }
+
