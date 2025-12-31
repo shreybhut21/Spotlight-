@@ -101,11 +101,21 @@
     <img src="{{ user.avatar_url }}" alt="{{ user.username }}">
   </div>
 
-  <!-- BELL -->
-  <div class="bell-icon" onclick="openRequests()">
+ <!-- 🔔 BELL ICON -->
+<div class="bell-wrapper">
+  <div class="bell-icon" id="bellIcon" onclick="toggleBellBox()">
     🔔
-    <span id="bell-dot" class="hidden"></span>
+    <span id="bell-dot" class="bell-dot hidden"></span>
   </div>
+
+  <!-- REQUEST BOX -->
+  <div class="bell-box hidden" id="bellBox">
+    <div id="bellContent">
+      <p class="muted">No pending requests</p>
+    </div>
+  </div>
+</div>
+
 
   <!-- MAP -->
   <div id="map"></div>
