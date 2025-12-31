@@ -56,7 +56,10 @@ function initMap() {
 
       fetchNearbyUsers();
     },
-    () => alert("Please enable location services"),
+    err => {
+      console.error(err);
+      alert("Please enable location services");
+    },
     {
       enableHighAccuracy: true,
       timeout: 20000,
@@ -124,14 +127,19 @@ function openProfile(user) {
 async function sendRequest() {
   if (!selectedUserId) return;
 
-  await fetch("/api/send_request", {
+  const res = await fetch("/api/send_request", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ receiver_id: selectedUserId })
   });
 
+  if (!res.ok) {
+    alert("Failed to send request");
+    return;
+  }
+
   closeAllSheets();
-  alert("Request sent");
+  alert("Request sent ✅");
 }
 
 // ==========================
@@ -145,13 +153,16 @@ async function pollRequests() {
 
   if (data.type === "incoming") {
     currentRequestId = data.data.id;
+
     document.getElementById("bell-dot").classList.remove("hidden");
 
     document.getElementById("bellContent").innerHTML = `
       <strong>${data.data.username}</strong>
       <p>Wants to meet you</p>
-      <button onclick="respondRequest('accept')">Accept</button>
-      <button onclick="respondRequest('decline')">Decline</button>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button onclick="respondRequest('accept')" class="primary-btn">Accept</button>
+        <button onclick="respondRequest('decline')" class="secondary-btn">Decline</button>
+      </div>
     `;
   }
 }
@@ -160,6 +171,8 @@ async function pollRequests() {
 // RESPOND REQUEST
 // ==========================
 async function respondRequest(action) {
+  if (!currentRequestId) return;
+
   await fetch("/api/respond_request", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -169,6 +182,7 @@ async function respondRequest(action) {
     })
   });
 
+  currentRequestId = null;
   document.getElementById("bell-dot").classList.add("hidden");
   document.getElementById("bellBox").classList.add("hidden");
 }
@@ -182,7 +196,9 @@ function openSheet(id) {
 }
 
 function closeAllSheets() {
-  document.querySelectorAll(".bottom-sheet").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".bottom-sheet").forEach(s =>
+    s.classList.remove("active")
+  );
   setTimeout(() => document.getElementById("overlay").classList.add("hidden"), 300);
 }
 
