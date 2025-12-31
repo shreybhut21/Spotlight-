@@ -187,10 +187,34 @@ def send_request():
             return jsonify({"status": "already_sent"}), 409
 
         app.logger.info(f"REQUEST INSERT: {sender_id} -> {receiver_id}")
-        conn.execute(
-            "INSERT INTO requests (sender_id, receiver_id, status, created_at) VALUES (?, ?, 'pending', ?)",
-            (sender_id, receiver_id, time.time()),
-        )
+
+        # adapt to current requests table schema (some deployments may have extra NOT NULL columns)
+        cols_info = conn.execute("PRAGMA table_info(requests)").fetchall()
+        cols = [c[1] for c in cols_info]
+
+        insert_cols = []
+        values = []
+
+        # required base columns
+        for name, val in (('sender_id', sender_id), ('receiver_id', receiver_id), ('status', 'pending'), ('created_at', time.time())):
+            if name in cols:
+                insert_cols.append(name)
+                values.append(val)
+
+        # handle optional/legacy columns like spotlight_id
+        if 'spotlight_id' in cols:
+            insert_cols.append('spotlight_id')
+            # if the column was declared NOT NULL without a default, insert a safe sentinel 0
+            # otherwise insert NULL
+            col_meta = next((c for c in cols_info if c[1] == 'spotlight_id'), None)
+            if col_meta and col_meta[3] == 1:  # notnull flag
+                values.append(0)
+            else:
+                values.append(None)
+
+        placeholders = ','.join(['?'] * len(insert_cols))
+        sql = f"INSERT INTO requests ({', '.join(insert_cols)}) VALUES ({placeholders})"
+        conn.execute(sql, tuple(values))
         conn.commit()
 
         app.logger.info("Request inserted and committed")
