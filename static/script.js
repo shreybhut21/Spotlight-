@@ -110,6 +110,49 @@ async function fetchNearbyUsers() {
     nearbyMarkers.push(marker);
   });
 }
+// ==========================
+// GO LIVE (REQUIRED)
+// ==========================
+async function confirmCheckIn() {
+  if (!locationReady) {
+    alert("Waiting for GPS fix…");
+    return;
+  }
+
+  const place = document.getElementById("place")?.value.trim();
+  const intent = document.getElementById("intent")?.value.trim();
+  const meetTime = document.getElementById("meet_time")?.value;
+  const clue = document.getElementById("visual-clue")?.value.trim();
+
+  if (!place || !intent || !clue) {
+    alert("Please fill all required fields");
+    return;
+  }
+
+  const res = await fetch("/api/checkin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lat: myLat,
+      lon: myLon,
+      place,
+      intent,
+      meet_time: meetTime,
+      clue
+    })
+  });
+
+  if (!res.ok) {
+    alert("Failed to go live");
+    return;
+  }
+
+  closeAllSheets();
+  document.getElementById("main-fab").style.display = "none";
+  document.getElementById("live-indicator").classList.remove("hidden");
+
+  alert("You are LIVE 🔴");
+}
 
 // ==========================
 // PROFILE
@@ -215,3 +258,4 @@ document.addEventListener("click", e => {
     document.getElementById("bellBox").classList.add("hidden");
   }
 });
+
