@@ -42,7 +42,7 @@ def login():
         "SELECT * FROM users WHERE username = ?", (username,)
     ).fetchone()
 
-    if not user or not user["password_hash"] or not check_password_hash(user["password_hash"], password):
+    if not user or not check_password_hash(user["password_hash"], password):
         return render_template("auth.html", error="Invalid credentials")
 
     session["user_id"] = user["id"]
@@ -52,9 +52,6 @@ def login():
 def signup():
     username = request.form.get("username")
     password = request.form.get("password")
-
-    if not username or not password:
-        return render_template("auth.html", error="Missing fields")
 
     conn = db.get_db_connection()
     exists = conn.execute(
@@ -126,8 +123,44 @@ def user_info():
     ).fetchone()
 
     return jsonify({"trust_score": user["trust_score"]})
+
+# ----------------------------
+# API – SEND REQUEST (🔥 MISSING BEFORE)
+# ----------------------------
+@app.route("/api/send_request", methods=["POST"])
+def send_request():
+    if "user_id" not in session:
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.json
+    sender_id = session["user_id"]
+    receiver_id = data.get("receiver_id")
+
+    if not receiver_id:
+        return jsonify({"error": "missing receiver"}), 400
+
+    conn = db.get_db_connection()
+    print("REQUEST INSERT:", sender_id, "→", receiver_id)
+
+    conn.execute(
+        """
+        INSERT INTO requests (sender_id, receiver_id, status, created_at)
+        VALUES (?, ?, 'pending', ?)
+        """,
+        (sender_id, receiver_id, time.time())
+    )
+    conn.commit()
+
+    return jsonify({"status": "sent"})
+
+# ----------------------------
+# API – CHECK REQUESTS
+# ----------------------------
 @app.route("/api/check_requests")
 def check_requests():
+    if "user_id" not in session:
+        return jsonify({"type": "none"})
+
     uid = session["user_id"]
     conn = db.get_db_connection()
 
@@ -135,18 +168,22 @@ def check_requests():
         SELECT r.id, u.username
         FROM requests r
         JOIN users u ON u.id = r.sender_id
-        WHERE r.receiver_id = ? AND r.status = 'pending'
-        ORDER BY r.id DESC
+        WHERE r.receiver_id = ?
+          AND r.status = 'pending'
+        ORDER BY r.created_at DESC
         LIMIT 1
     """, (uid,)).fetchone()
 
     if req:
         return jsonify({
             "type": "incoming",
-            "data": dict(req)
+            "data": {
+                "id": req["id"],
+                "username": req["username"]
+            }
         })
 
-    return jsonify({ "type": "none" })
+    return jsonify({"type": "none"})
 
 # ----------------------------
 # API – CHECK IN / OUT
@@ -158,8 +195,6 @@ def checkin():
 
     data = request.json
     user_id = session["user_id"]
-
-    print("CHECKIN:", user_id, data["lat"], data["lon"])  # 👈 ADD THIS
 
     expiry = time.time() + (2 * 60 * 60 if data.get("meet_time") else 90 * 60)
 
@@ -230,9 +265,6 @@ def nearby():
                 "lat": r["lat"],
                 "lon": r["lon"],
                 "username": r["username"],
-                "place": r["place"],
-                "intent": r["intent"],
-                "meet_time": r["meet_time"],
                 "trust_score": r["trust_score"],
                 "distance": round(dist, 1),
             })
@@ -240,7 +272,7 @@ def nearby():
     return jsonify(result)
 
 # ----------------------------
-# RUN (LOCAL ONLY)
+# RUN
 # ----------------------------
 if __name__ == "__main__":
     app.run(debug=True)
