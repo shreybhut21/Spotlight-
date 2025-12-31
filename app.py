@@ -42,7 +42,9 @@ def login():
         "SELECT * FROM users WHERE username = ?", (username,)
     ).fetchone()
 
-    if not user or not check_password_hash(user["password_hash"], password):
+    # defend against malformed DB rows where password_hash may be NULL/empty
+    pwd_hash = user["password_hash"] if user else None
+    if not user or not pwd_hash or not check_password_hash(pwd_hash, password):
         return render_template("auth.html", error="Invalid credentials")
 
     session["user_id"] = user["id"]
