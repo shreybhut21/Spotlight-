@@ -126,6 +126,27 @@ def user_info():
     ).fetchone()
 
     return jsonify({"trust_score": user["trust_score"]})
+@app.route("/api/check_requests")
+def check_requests():
+    uid = session["user_id"]
+    conn = db.get_db_connection()
+
+    req = conn.execute("""
+        SELECT r.id, u.username
+        FROM requests r
+        JOIN users u ON u.id = r.sender_id
+        WHERE r.receiver_id = ? AND r.status = 'pending'
+        ORDER BY r.id DESC
+        LIMIT 1
+    """, (uid,)).fetchone()
+
+    if req:
+        return jsonify({
+            "type": "incoming",
+            "data": dict(req)
+        })
+
+    return jsonify({ "type": "none" })
 
 # ----------------------------
 # API – CHECK IN / OUT
