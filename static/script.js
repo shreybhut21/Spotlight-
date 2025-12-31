@@ -56,15 +56,8 @@ function initMap() {
 
       fetchNearbyUsers();
     },
-    err => {
-      console.error(err);
-      alert("Please enable location services");
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 20000,
-      maximumAge: 0
-    }
+    () => alert("Please enable location services"),
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
   );
 }
 
@@ -72,10 +65,15 @@ function initMap() {
 // USER INFO
 // ==========================
 async function fetchUserInfo() {
-  const res = await fetch("/api/user_info");
-  if (!res.ok) return;
-  const data = await res.json();
-  document.getElementById("my-trust-score").innerText = data.trust_score ?? "--";
+  try {
+    const res = await fetch("/api/user_info");
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById("my-trust-score").innerText =
+      data.trust_score ?? "--";
+  } catch (e) {
+    console.error("user_info error", e);
+  }
 }
 
 // ==========================
@@ -85,6 +83,8 @@ async function fetchNearbyUsers() {
   if (!locationReady) return;
 
   const res = await fetch(`/api/nearby?lat=${myLat}&lon=${myLon}`);
+  if (!res.ok) return;
+
   const users = await res.json();
 
   nearbyMarkers.forEach(m => map.removeLayer(m));
@@ -110,8 +110,19 @@ async function fetchNearbyUsers() {
     nearbyMarkers.push(marker);
   });
 }
+
 // ==========================
-// GO LIVE (REQUIRED)
+// PROFILE
+// ==========================
+function openProfile(user) {
+  selectedUserId = user.id;
+  document.getElementById("p-username").innerText = user.username;
+  document.getElementById("p-score").innerText = user.trust_score ?? "--";
+  openSheet("profile-sheet");
+}
+
+// ==========================
+// CHECK IN (GO LIVE) ✅
 // ==========================
 async function confirmCheckIn() {
   if (!locationReady) {
@@ -119,10 +130,10 @@ async function confirmCheckIn() {
     return;
   }
 
-  const place = document.getElementById("place")?.value.trim();
-  const intent = document.getElementById("intent")?.value.trim();
-  const meetTime = document.getElementById("meet_time")?.value;
-  const clue = document.getElementById("visual-clue")?.value.trim();
+  const place = document.getElementById("place").value.trim();
+  const intent = document.getElementById("intent").value.trim();
+  const meet_time = document.getElementById("meet_time").value || null;
+  const clue = document.getElementById("visual-clue").value.trim();
 
   if (!place || !intent || !clue) {
     alert("Please fill all required fields");
@@ -137,7 +148,7 @@ async function confirmCheckIn() {
       lon: myLon,
       place,
       intent,
-      meet_time: meetTime,
+      meet_time,
       clue
     })
   });
@@ -147,21 +158,23 @@ async function confirmCheckIn() {
     return;
   }
 
-  closeAllSheets();
-  document.getElementById("main-fab").style.display = "none";
   document.getElementById("live-indicator").classList.remove("hidden");
-
-  alert("You are LIVE 🔴");
+  document.getElementById("main-fab").style.display = "none";
+  closeAllSheets();
 }
 
 // ==========================
-// PROFILE
+// TURN OFF LIVE ✅
 // ==========================
-function openProfile(user) {
-  selectedUserId = user.id;
-  document.getElementById("p-username").innerText = user.username;
-  document.getElementById("p-score").innerText = user.trust_score ?? "--";
-  openSheet("profile-sheet");
+async function turnOffSpotlight() {
+  const res = await fetch("/api/checkout", { method: "POST" });
+  if (!res.ok) {
+    alert("Failed to turn off");
+    return;
+  }
+
+  document.getElementById("live-indicator").classList.add("hidden");
+  document.getElementById("main-fab").style.display = "flex";
 }
 
 // ==========================
@@ -177,7 +190,7 @@ async function sendRequest() {
   });
 
   if (!res.ok) {
-    alert("Failed to send request");
+    alert("Request failed");
     return;
   }
 
@@ -196,7 +209,6 @@ async function pollRequests() {
 
   if (data.type === "incoming") {
     currentRequestId = data.data.id;
-
     document.getElementById("bell-dot").classList.remove("hidden");
 
     document.getElementById("bellContent").innerHTML = `
@@ -219,10 +231,7 @@ async function respondRequest(action) {
   await fetch("/api/respond_request", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      request_id: currentRequestId,
-      action
-    })
+    body: JSON.stringify({ request_id: currentRequestId, action })
   });
 
   currentRequestId = null;
@@ -259,3 +268,9 @@ document.addEventListener("click", e => {
   }
 });
 
+// ==========================
+// SETTINGS
+// ==========================
+function goToSettings() {
+  window.location.href = "/settings";
+}
