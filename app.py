@@ -154,20 +154,53 @@ def send_request():
     if "user_id" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    data = request.json
-    sender_id = session["user_id"]
     try:
+        data = request.get_json(silent=True)
+        app.logger.debug(f"send_request payload: {data} session_user={session.get('user_id')}")
+        sender_id = session["user_id"]
+        if not data:
+            return jsonify({"error": "missing json body"}), 400
         receiver_id = int(data.get("receiver_id"))
-    except Exception:
+    except (ValueError, TypeError):
         return jsonify({"error": "invalid receiver id"}), 400
+    except Exception:
+        app.logger.exception("Unexpected error parsing send_request payload")
+        return jsonify({"error": "bad request"}), 400
 
     if receiver_id == sender_id:
         return jsonify({"error": "cannot send request to yourself"}), 400
 
-    conn = db.get_db_connection()
+    try:
+        conn = db.get_db_connection()
+        # validate receiver exists and is active
+        recv = conn.execute("SELECT id, is_active FROM users WHERE id = ?", (receiver_id,)).fetchone()
+        if not recv or recv.get("is_active") != 1:
+            return jsonify({"error": "receiver not found"}), 404
+
+        # prevent duplicate pending requests
+        existing = conn.execute(
+            "SELECT id FROM requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'",
+            (sender_id, receiver_id),
+        ).fetchone()
+        if existing:
+            app.logger.debug(f"Duplicate request prevented: sender={sender_id} receiver={receiver_id} existing_id={existing['id']}")
+            return jsonify({"status": "already_sent"}), 409
+
+        app.logger.info(f"REQUEST INSERT: {sender_id} -> {receiver_id}")
+        conn.execute(
+            "INSERT INTO requests (sender_id, receiver_id, status, created_at) VALUES (?, ?, 'pending', ?)",
+            (sender_id, receiver_id, time.time()),
+        )
+        conn.commit()
+
+        app.logger.info("Request inserted and committed")
+        return jsonify({"status": "sent"})
+    except Exception:
+        app.logger.exception("Error while handling send_request")
+        return jsonify({"error": "internal error"}), 500
     # validate receiver exists and is active
     recv = conn.execute("SELECT id, is_active FROM users WHERE id = ?", (receiver_id,)).fetchone()
-    if not recv or recv.get("is_active") != 1:
+    if not recv or recv["is_active"] != 1:
         return jsonify({"error": "receiver not found"}), 404
 
     # prevent duplicate pending requests
