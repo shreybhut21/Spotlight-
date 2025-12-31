@@ -148,6 +148,10 @@
                 <h2>Welcome Back</h2>
                 <p>Log in to see who is nearby.</p>
 
+                {% if error %}
+                <div style="background:#3b1f00;color:#ffd9a8;padding:10px;border-radius:8px;margin-bottom:12px;">{{ error }}</div>
+                {% endif %}
+
                 <form action="/login" method="POST">
                     <div class="form-group">
                         <input type="text" name="username" placeholder="Username" required>
