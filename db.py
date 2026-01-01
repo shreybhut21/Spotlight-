@@ -49,6 +49,8 @@ def init_db():
             vibe_tags TEXT,
             avatar_url TEXT,
             is_active INTEGER DEFAULT 1,
+            is_matched INTEGER DEFAULT 0,
+            matched_with INTEGER,
             created_at REAL
         )
     """)
