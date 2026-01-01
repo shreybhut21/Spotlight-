@@ -36,30 +36,60 @@ def init_db():
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
-    # --------------------------------------------------
-    # USERS
-    # --------------------------------------------------
+    # ---------------- USERS ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-
             gender TEXT,
             trust_score INTEGER DEFAULT 100,
             avatar_level INTEGER DEFAULT 1,
             vibe_tags TEXT,
             avatar_url TEXT,
-
             is_active INTEGER DEFAULT 1,
-
-            -- MATCH MODE
-            is_matched INTEGER DEFAULT 0,
-            matched_with INTEGER,
-
             created_at REAL
         )
     """)
+
+    # ---- AUTO-MIGRATION (SAFE) ----
+    existing_cols = [row[1] for row in c.execute("PRAGMA table_info(users)")]
+
+    if "is_matched" not in existing_cols:
+        c.execute("ALTER TABLE users ADD COLUMN is_matched INTEGER DEFAULT 0")
+
+    if "matched_with" not in existing_cols:
+        c.execute("ALTER TABLE users ADD COLUMN matched_with INTEGER")
+
+    # ---------------- SPOTLIGHTS ----------------
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS spotlights (
+            user_id INTEGER,
+            lat REAL,
+            lon REAL,
+            place TEXT,
+            intent TEXT,
+            meet_time TEXT,
+            clue TEXT,
+            timestamp REAL,
+            expiry REAL
+        )
+    """)
+
+    # ---------------- REQUESTS ----------------
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            status TEXT CHECK(status IN ('pending','accepted','declined')),
+            created_at REAL
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
 
     # Add missing columns if they don't exist
     c.execute("PRAGMA table_info(users)")
