@@ -140,11 +140,15 @@ def user_info():
 
     conn = db.get_db_connection()
     user = conn.execute(
-        "SELECT trust_score FROM users WHERE id = ?",
+        "SELECT trust_score, is_matched, matched_with FROM users WHERE id = ?",
         (session["user_id"],)
     ).fetchone()
 
-    return jsonify({"trust_score": user["trust_score"]})
+    return jsonify({
+        "trust_score": user["trust_score"],
+        "is_matched": user["is_matched"],
+        "matched_with": user["matched_with"]
+    })
 
 # ----------------------------
 # API – SEND REQUEST (🔥 MISSING BEFORE)
@@ -267,35 +271,50 @@ def respond_request():
     if "user_id" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    request_id = request.json.get("request_id")
-    action = request.json.get("action")  # accept / decline
-
-    status = "accepted" if action == "accept" else "declined"
+    data = request.json
+    request_id = data["request_id"]
+    action = data["action"]
+    user_id = session["user_id"]
 
     conn = db.get_db_connection()
-    app.logger.info(f"Respond request id={request_id} action={action} by user_id={session.get('user_id')}")
 
-    if not request_id:
-        return jsonify({"error": "missing request_id"}), 400
+    req = conn.execute(
+        "SELECT * FROM requests WHERE id = ?",
+        (request_id,)
+    ).fetchone()
 
-    # validate request exists
-    req = conn.execute("SELECT id, sender_id, receiver_id, status FROM requests WHERE id = ?", (request_id,)).fetchone()
     if not req:
         return jsonify({"error": "request not found"}), 404
 
-    # only the receiver may respond
-    if req["receiver_id"] != session["user_id"]:
-        app.logger.warning(f"Unauthorized respond attempt user={session.get('user_id')} on request={request_id}")
-        return jsonify({"error": "forbidden"}), 403
+    if action == "accept":
+        # 1️⃣ mark request accepted
+        conn.execute(
+            "UPDATE requests SET status = 'accepted' WHERE id = ?",
+            (request_id,)
+        )
 
-    if req["status"] != "pending":
-        return jsonify({"error": "request already handled"}), 400
+        sender = req["sender_id"]
+        receiver = req["receiver_id"]
 
-    conn.execute("UPDATE requests SET status = ? WHERE id = ?", (status, request_id))
+        # 2️⃣ MATCH BOTH USERS
+        conn.execute(
+            "UPDATE users SET is_matched = 1, matched_with = ? WHERE id = ?",
+            (receiver, sender)
+        )
+        conn.execute(
+            "UPDATE users SET is_matched = 1, matched_with = ? WHERE id = ?",
+            (sender, receiver)
+        )
+
+    else:
+        conn.execute(
+            "UPDATE requests SET status = 'declined' WHERE id = ?",
+            (request_id,)
+        )
+
     conn.commit()
+    return jsonify({"status": action})
 
-    app.logger.info(f"Request {request_id} updated to {status}")
-    return jsonify({"status": status})
 
 # ----------------------------
 # API – CHECK IN / OUT
@@ -350,6 +369,18 @@ def checkout():
     app.logger.info(f"User {user_id} checked out (spotlight removed)")
 
     return jsonify({"status": "off"})
+@app.route("/api/match_status")
+def match_status():
+    if "user_id" not in session:
+        return jsonify({}), 401
+
+    conn = db.get_db_connection()
+    user = conn.execute(
+        "SELECT is_matched, matched_with FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    return jsonify(dict(user))
 
 # ----------------------------
 # API – NEARBY USERS
@@ -371,7 +402,9 @@ def nearby():
         SELECT s.*, u.username, u.trust_score
         FROM spotlights s
         JOIN users u ON u.id = s.user_id
-        WHERE s.expiry > ? AND s.user_id != ?
+        WHERE s.expiry > ?
+        AND s.user_id != ?
+        AND u.is_matched = 0
         """,
         (time.time(), me),
     ).fetchall()
