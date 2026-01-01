@@ -9,6 +9,7 @@ let nearbyMarkers = [];
 let selectedUserId = null;
 let currentRequestId = null;
 let locationReady = false;
+let requestPoller = null;
 
 // ==========================
 // INIT
@@ -16,7 +17,7 @@ let locationReady = false;
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
   fetchUserInfo();
-  setInterval(pollRequests, 5000);
+  window.requestPoller = setInterval(pollRequests, 5000);
 });
 
 // ==========================
@@ -219,6 +220,27 @@ async function pollRequests() {
         <button onclick="respondRequest('decline')" class="secondary-btn">Decline</button>
       </div>
     `;
+  }
+
+  // also check if user got matched (accept flow sets is_matched on both users)
+  try {
+    const infoRes = await fetch("/api/user_info");
+    if (infoRes.ok) {
+      const info = await infoRes.json();
+      if (info.is_matched === 1) {
+        // stop polling
+        clearInterval(window.requestPoller);
+
+        // optional: hide map markers
+        nearbyMarkers.forEach(m => map.removeLayer(m));
+        nearbyMarkers = [];
+
+        // show match confirmation
+        alert("🎉 You’re matched!");
+      }
+    }
+  } catch (e) {
+    console.error("user_info poll error", e);
   }
 }
 
