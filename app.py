@@ -12,6 +12,7 @@ app = Flask(
     static_folder="static",
     static_url_path="/static"
 )
+
 app.secret_key = os.environ.get("SPOTLIGHT_SECRET_KEY", "spotlight_secret_key")
 app.logger.setLevel(logging.DEBUG)
 
@@ -40,34 +41,18 @@ def login():
     username = request.form.get("username")
     password = request.form.get("password")
 
-    app.logger.info(f"Login attempt username={username}")
-
     conn = db.get_db_connection()
     user = conn.execute(
         "SELECT * FROM users WHERE username = ?", (username,)
     ).fetchone()
 
-    # defend against malformed DB rows where password_hash may be NULL/empty
-    pwd_hash = user["password_hash"] if user else None
-
-    if not user:
-        app.logger.info(f"Login failed: user not found username={username}")
+    if not user or not user["password_hash"]:
         return render_template("auth.html", error="Invalid credentials")
 
-    if not pwd_hash:
-        app.logger.warning(f"Login failed: missing password_hash for username={username}")
+    if not check_password_hash(user["password_hash"], password):
         return render_template("auth.html", error="Invalid credentials")
-
-    try:
-        if not check_password_hash(pwd_hash, password):
-            app.logger.info(f"Login failed: bad password for username={username}")
-            return render_template("auth.html", error="Invalid credentials")
-    except Exception:
-        app.logger.exception("Error while checking password_hash")
-        return render_template("auth.html", error="Internal error")
 
     session["user_id"] = user["id"]
-    app.logger.info(f"Login success user_id={user['id']} username={username}")
     return redirect(url_for("index_html"))
 
 @app.route("/signup", methods=["POST"])
@@ -84,13 +69,14 @@ def signup():
         return render_template("auth.html", error="Username already exists")
 
     pwd_hash = generate_password_hash(password)
+
     conn.execute(
         """
         INSERT INTO users
-        (username, password_hash, avatar_level, trust_score, vibe_tags, avatar_url, created_at)
+        (username, password_hash, trust_score, is_matched, matched_with, is_active, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (username, pwd_hash, 1, 100, "", "static/default-avatar.png", time.time())
+        (username, pwd_hash, 100, 0, None, 1, time.time())
     )
     conn.commit()
 
@@ -117,19 +103,6 @@ def index_html():
 
     return render_template("index.html", user=user)
 
-@app.route("/settings")
-def settings():
-    if "user_id" not in session:
-        return redirect("/auth")
-
-    conn = db.get_db_connection()
-    user = conn.execute(
-        "SELECT username, trust_score FROM users WHERE id = ?",
-        (session["user_id"],)
-    ).fetchone()
-
-    return render_template("settings.html", user=user)
-
 # ----------------------------
 # API – USER INFO
 # ----------------------------
@@ -144,88 +117,45 @@ def user_info():
         (session["user_id"],)
     ).fetchone()
 
-    return jsonify({
-        "trust_score": user["trust_score"],
-        "is_matched": user["is_matched"],
-        "matched_with": user["matched_with"]
-    })
+    return jsonify(dict(user))
 
 # ----------------------------
-# API – SEND REQUEST (🔥 MISSING BEFORE)
+# API – SEND REQUEST
 # ----------------------------
 @app.route("/api/send_request", methods=["POST"])
 def send_request():
     if "user_id" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    try:
-        data = request.get_json(silent=True)
-        app.logger.debug(f"send_request payload: {data} session_user={session.get('user_id')}")
-        sender_id = session["user_id"]
-        if not data:
-            return jsonify({"error": "missing json body"}), 400
-        receiver_id = int(data.get("receiver_id"))
-    except (ValueError, TypeError):
-        return jsonify({"error": "invalid receiver id"}), 400
-    except Exception:
-        app.logger.exception("Unexpected error parsing send_request payload")
-        return jsonify({"error": "bad request"}), 400
+    sender_id = session["user_id"]
+    receiver_id = request.json.get("receiver_id")
 
-    if receiver_id == sender_id:
-        return jsonify({"error": "cannot send request to yourself"}), 400
+    if sender_id == receiver_id:
+        return jsonify({"error": "invalid"}), 400
 
-    try:
-        conn = db.get_db_connection()
-        # validate receiver exists and is active
-        recv = conn.execute("SELECT id, is_active FROM users WHERE id = ?", (receiver_id,)).fetchone()
-        if not recv or recv["is_active"] != 1:
-            return jsonify({"error": "receiver not found"}), 404
+    conn = db.get_db_connection()
 
-        # prevent duplicate pending requests
-        existing = conn.execute(
-            "SELECT id FROM requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'",
-            (sender_id, receiver_id),
-        ).fetchone()
-        if existing:
-            app.logger.debug(f"Duplicate request prevented: sender={sender_id} receiver={receiver_id} existing_id={existing['id']}")
-            return jsonify({"status": "already_sent"}), 409
+    existing = conn.execute(
+        """
+        SELECT id FROM requests
+        WHERE sender_id=? AND receiver_id=? AND status='pending'
+        """,
+        (sender_id, receiver_id)
+    ).fetchone()
 
-        app.logger.info(f"REQUEST INSERT: {sender_id} -> {receiver_id}")
+    if existing:
+        return jsonify({"status": "already_sent"}), 409
 
-        # adapt to current requests table schema (some deployments may have extra NOT NULL columns)
-        cols_info = conn.execute("PRAGMA table_info(requests)").fetchall()
-        cols = [c[1] for c in cols_info]
+    conn.execute(
+        """
+        INSERT INTO requests (sender_id, receiver_id, status, matched, created_at)
+        VALUES (?, ?, 'pending', 0, ?)
+        """,
+        (sender_id, receiver_id, time.time())
+    )
+    conn.commit()
 
-        insert_cols = []
-        values = []
-
-        # required base columns
-        for name, val in (('sender_id', sender_id), ('receiver_id', receiver_id), ('status', 'pending'), ('created_at', time.time())):
-            if name in cols:
-                insert_cols.append(name)
-                values.append(val)
-
-        # handle optional/legacy columns like spotlight_id
-        if 'spotlight_id' in cols:
-            insert_cols.append('spotlight_id')
-            # if the column was declared NOT NULL without a default, insert a safe sentinel 0
-            # otherwise insert NULL
-            col_meta = next((c for c in cols_info if c[1] == 'spotlight_id'), None)
-            if col_meta and col_meta[3] == 1:  # notnull flag
-                values.append(0)
-            else:
-                values.append(None)
-
-        placeholders = ','.join(['?'] * len(insert_cols))
-        sql = f"INSERT INTO requests ({', '.join(insert_cols)}) VALUES ({placeholders})"
-        conn.execute(sql, tuple(values))
-        conn.commit()
-
-        app.logger.info("Request inserted and committed")
-        return jsonify({"status": "sent"})
-    except Exception:
-        app.logger.exception("Error while handling send_request")
-        return jsonify({"error": "internal error"}), 500
+    return jsonify({"status": "sent"})
 
 # ----------------------------
 # API – CHECK REQUESTS
@@ -238,7 +168,8 @@ def check_requests():
     uid = session["user_id"]
     conn = db.get_db_connection()
 
-    req = conn.execute("""
+    req = conn.execute(
+        """
         SELECT r.id, u.username
         FROM requests r
         JOIN users u ON u.id = r.sender_id
@@ -246,78 +177,100 @@ def check_requests():
           AND r.status = 'pending'
         ORDER BY r.created_at DESC
         LIMIT 1
-    """, (uid,)).fetchone()
+        """,
+        (uid,)
+    ).fetchone()
 
     if req:
-        app.logger.info(f"Incoming request for user_id={uid} from {req['id']}")
         return jsonify({
             "type": "incoming",
-            "data": {
-                "id": req["id"],
-                "username": req["username"]
-            }
+            "data": {"id": req["id"], "username": req["username"]}
         })
 
-    app.logger.debug(f"No incoming requests for user_id={uid}")
     return jsonify({"type": "none"})
-# ----------------------------
-
 
 # ----------------------------
-# API – RESPOND REQUEST
+# API – RESPOND REQUEST (🔥 MATCH MODE FIX)
 # ----------------------------
 @app.route("/api/respond_request", methods=["POST"])
 def respond_request():
     if "user_id" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    data = request.json
-    request_id = data["request_id"]
-    action = data["action"]
-    user_id = session["user_id"]
+    req_id = request.json["request_id"]
+    action = request.json["action"]
 
     conn = db.get_db_connection()
-
     req = conn.execute(
-        "SELECT * FROM requests WHERE id = ?",
-        (request_id,)
+        "SELECT * FROM requests WHERE id = ?", (req_id,)
     ).fetchone()
 
     if not req:
-        return jsonify({"error": "request not found"}), 404
+        return jsonify({"error": "not found"}), 404
 
     if action == "accept":
-        # 1️⃣ mark request accepted
+        # mark request
         conn.execute(
-            "UPDATE requests SET status = 'accepted' WHERE id = ?",
-            (request_id,)
+            "UPDATE requests SET status='accepted', matched=1 WHERE id=?",
+            (req_id,)
         )
 
-        sender = req["sender_id"]
-        receiver = req["receiver_id"]
-
-        # 2️⃣ MATCH BOTH USERS
+        # 🔒 LOCK BOTH USERS (MATCH MODE)
         conn.execute(
-            "UPDATE users SET is_matched = 1, matched_with = ? WHERE id = ?",
-            (receiver, sender)
+            "UPDATE users SET is_matched=1, matched_with=? WHERE id=?",
+            (req["receiver_id"], req["sender_id"])
         )
         conn.execute(
-            "UPDATE users SET is_matched = 1, matched_with = ? WHERE id = ?",
-            (sender, receiver)
+            "UPDATE users SET is_matched=1, matched_with=? WHERE id=?",
+            (req["sender_id"], req["receiver_id"])
+        )
+
+        # remove both from map
+        conn.execute(
+            "DELETE FROM spotlights WHERE user_id IN (?, ?)",
+            (req["sender_id"], req["receiver_id"])
         )
 
     else:
         conn.execute(
-            "UPDATE requests SET status = 'declined' WHERE id = ?",
-            (request_id,)
+            "UPDATE requests SET status='declined' WHERE id=?",
+            (req_id,)
         )
 
     conn.commit()
     return jsonify({"status": action})
 
+# ----------------------------
+# API – MATCH STATUS
+# ----------------------------
+@app.route("/api/match_status")
+def match_status():
+    if "user_id" not in session:
+        return jsonify({"matched": False})
+
+    uid = session["user_id"]
+    conn = db.get_db_connection()
+
+    user = conn.execute(
+        "SELECT is_matched, matched_with FROM users WHERE id=?",
+        (uid,)
+    ).fetchone()
+
+    if not user["is_matched"]:
+        return jsonify({"matched": False})
+
+    partner = conn.execute(
+        "SELECT username FROM users WHERE id=?",
+        (user["matched_with"],)
+    ).fetchone()
+
+    return jsonify({
+        "matched": True,
+        "partner": partner["username"]
+    })
 
 # ----------------------------
-# API – CHECK IN / OUT
+# API – CHECKIN / CHECKOUT
 # ----------------------------
 @app.route("/api/checkin", methods=["POST"])
 def checkin():
@@ -327,12 +280,10 @@ def checkin():
     data = request.json
     user_id = session["user_id"]
 
-    app.logger.info(f"Checkin attempt user_id={user_id} lat={data.get('lat')} lon={data.get('lon')}")
-
     expiry = time.time() + (2 * 60 * 60 if data.get("meet_time") else 90 * 60)
 
     conn = db.get_db_connection()
-    conn.execute("DELETE FROM spotlights WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM spotlights WHERE user_id=?", (user_id,))
     conn.execute(
         """
         INSERT INTO spotlights
@@ -349,11 +300,9 @@ def checkin():
             data["clue"],
             time.time(),
             expiry,
-        ),
+        )
     )
     conn.commit()
-
-    app.logger.info(f"User {user_id} is now live")
     return jsonify({"status": "live"})
 
 @app.route("/api/checkout", methods=["POST"])
@@ -361,29 +310,13 @@ def checkout():
     if "user_id" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    user_id = session["user_id"]
-    app.logger.info(f"Checkout attempt user_id={user_id}")
     conn = db.get_db_connection()
-    conn.execute("DELETE FROM spotlights WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM spotlights WHERE user_id=?", (session["user_id"],))
     conn.commit()
-    app.logger.info(f"User {user_id} checked out (spotlight removed)")
-
     return jsonify({"status": "off"})
-@app.route("/api/match_status")
-def match_status():
-    if "user_id" not in session:
-        return jsonify({}), 401
-
-    conn = db.get_db_connection()
-    user = conn.execute(
-        "SELECT is_matched, matched_with FROM users WHERE id = ?",
-        (session["user_id"],)
-    ).fetchone()
-
-    return jsonify(dict(user))
 
 # ----------------------------
-# API – NEARBY USERS
+# API – NEARBY USERS (MATCH-SAFE)
 # ----------------------------
 @app.route("/api/nearby")
 def nearby():
@@ -394,8 +327,6 @@ def nearby():
     lon = float(request.args.get("lon"))
     me = session["user_id"]
 
-    app.logger.debug(f"Nearby request from user_id={me} lat={lat} lon={lon}")
-
     conn = db.get_db_connection()
     rows = conn.execute(
         """
@@ -403,23 +334,21 @@ def nearby():
         FROM spotlights s
         JOIN users u ON u.id = s.user_id
         WHERE s.expiry > ?
-        AND s.user_id != ?
-        AND u.is_matched = 0
+          AND s.user_id != ?
+          AND u.is_matched = 0
         """,
-        (time.time(), me),
+        (time.time(), me)
     ).fetchall()
 
     result = []
     for r in rows:
-        dist = geodesic((lat, lon), (r["lat"], r["lon"])).km
-        if dist <= 5:
+        if geodesic((lat, lon), (r["lat"], r["lon"])).km <= 5:
             result.append({
                 "id": r["user_id"],
                 "lat": r["lat"],
                 "lon": r["lon"],
                 "username": r["username"],
                 "trust_score": r["trust_score"],
-                "distance": round(dist, 1),
             })
 
     return jsonify(result)
