@@ -90,7 +90,7 @@ def init_db():
         existing_req_cols = []
 
     if "spotlight_id" in existing_req_cols:
-        # 🔥 Legacy broken table → rebuild clean
+        # rebuild legacy table
         c.execute("ALTER TABLE requests RENAME TO _requests_old")
 
         c.execute("""
@@ -113,7 +113,6 @@ def init_db():
         """)
 
         c.execute("DROP TABLE _requests_old")
-
     else:
         c.execute("""
             CREATE TABLE IF NOT EXISTS requests (
@@ -129,7 +128,7 @@ def init_db():
         """)
 
     # --------------------------------------------------
-    # MATCHES (ACTIVE / ENDED)
+    # MATCHES (ONE ROW PER MATCH)
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS matches (
@@ -163,6 +162,10 @@ def init_db():
             UNIQUE(match_id, reviewer_id)
         )
     """)
+
+    # helpful indexes (performance + safety)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed ON reviews(reviewed_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_matches_users ON matches(user1_id, user2_id)")
 
     conn.commit()
     conn.close()
