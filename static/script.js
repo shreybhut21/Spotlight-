@@ -215,12 +215,25 @@ async function sendRequest() {
       body: JSON.stringify({ receiver_id: selectedUserId })
     });
 
-    const data = await res.json();
+    if (res.status === 401) {
+      // Unauthorized, redirect to login
+      window.location.href = "/auth";
+      return;
+    }
+
+    let data;
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json();
+    } else {
+      // If not JSON, treat as error
+      data = { error: await res.text() };
+    }
 
     if (res.ok) {
       alert("Request sent!");
     } else {
-      alert(data.error || "Failed to send request");
+      alert(data.error || `Error ${res.status}: ${res.statusText}`);
     }
   } catch (error) {
     alert("Network error: " + error.message);
