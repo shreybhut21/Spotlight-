@@ -104,7 +104,7 @@ def index_html():
     return render_template("index.html", user=user)
 
 # ======================================================
-# API – USER INFO
+# API – USER INFO (🔥 KEY FOR MATCH MODE)
 # ======================================================
 @app.route("/api/user_info")
 def user_info():
@@ -136,12 +136,12 @@ def send_request():
     conn = db.get_db_connection()
 
     # block if either already matched
-    matched = conn.execute(
+    rows = conn.execute(
         "SELECT is_matched FROM users WHERE id IN (?, ?)",
         (sender_id, receiver_id)
     ).fetchall()
 
-    if any(row["is_matched"] for row in matched):
+    if any(r["is_matched"] for r in rows):
         return jsonify({"error": "already_matched"}), 409
 
     existing = conn.execute(
@@ -199,7 +199,7 @@ def check_requests():
     return jsonify({"type": "none"})
 
 # ======================================================
-# API – RESPOND REQUEST (ACCEPT / DECLINE)
+# API – RESPOND REQUEST (🔥 SYNC BOTH USERS)
 # ======================================================
 @app.route("/api/respond_request", methods=["POST"])
 def respond_request():
@@ -243,6 +243,7 @@ def respond_request():
         (request_id,)
     )
 
+    # 🔥 BOTH USERS ENTER MATCH MODE
     conn.execute(
         "UPDATE users SET is_matched=1, matched_with=? WHERE id=?",
         (sender_id, user_id)
@@ -252,7 +253,7 @@ def respond_request():
         (user_id, sender_id)
     )
 
-    # remove both from live map
+    # remove from live map
     conn.execute(
         "DELETE FROM spotlights WHERE user_id IN (?, ?)",
         (user_id, sender_id)
@@ -346,7 +347,7 @@ def checkout():
     return jsonify({"status": "off"})
 
 # ======================================================
-# API – NEARBY USERS (MATCH SAFE)
+# API – NEARBY USERS
 # ======================================================
 @app.route("/api/nearby")
 def nearby():
