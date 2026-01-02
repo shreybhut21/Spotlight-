@@ -200,6 +200,36 @@ async function turnOffSpotlight() {
 }
 
 // ==========================
+// SEND REQUEST
+// ==========================
+async function sendRequest() {
+  if (!selectedUserId) {
+    alert("No user selected");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/send_request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ receiver_id: selectedUserId })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      alert("Request sent!");
+    } else {
+      alert(data.error || "Failed to send request");
+    }
+  } catch (error) {
+    alert("Network error: " + error.message);
+  }
+
+  closeAllSheets();
+}
+
+// ==========================
 // REQUESTS
 // ==========================
 async function pollRequests() {
