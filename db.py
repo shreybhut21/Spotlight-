@@ -54,7 +54,6 @@ def init_db():
         )
     """)
 
-    # ---- AUTO-MIGRATION (users) ----
     user_cols = [r["name"] for r in c.execute("PRAGMA table_info(users)")]
 
     if "is_matched" not in user_cols:
@@ -64,7 +63,7 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN matched_with INTEGER")
 
     # --------------------------------------------------
-    # SPOTLIGHTS (LIVE USERS)
+    # SPOTLIGHTS
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS spotlights (
@@ -83,23 +82,51 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # REQUESTS (JOIN REQUESTS)
+    # REQUESTS (AUTO-FIX LEGACY SCHEMA)
     # --------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sender_id INTEGER NOT NULL,
-            receiver_id INTEGER NOT NULL,
-            status TEXT CHECK(status IN ('pending','accepted','declined'))
-                   DEFAULT 'pending',
-            created_at REAL,
-            FOREIGN KEY(sender_id) REFERENCES users(id),
-            FOREIGN KEY(receiver_id) REFERENCES users(id)
-        )
-    """)
+    existing_req_cols = [r["name"] for r in c.execute("PRAGMA table_info(requests)")]
+
+    if "spotlight_id" in existing_req_cols:
+        # 🔥 legacy broken table → rebuild clean
+        c.execute("ALTER TABLE requests RENAME TO _requests_old")
+
+        c.execute("""
+            CREATE TABLE requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL,
+                receiver_id INTEGER NOT NULL,
+                status TEXT CHECK(status IN ('pending','accepted','declined'))
+                       DEFAULT 'pending',
+                created_at REAL,
+                FOREIGN KEY(sender_id) REFERENCES users(id),
+                FOREIGN KEY(receiver_id) REFERENCES users(id)
+            )
+        """)
+
+        c.execute("""
+            INSERT INTO requests (id, sender_id, receiver_id, status, created_at)
+            SELECT id, sender_id, receiver_id, status, created_at
+            FROM _requests_old
+        """)
+
+        c.execute("DROP TABLE _requests_old")
+
+    else:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL,
+                receiver_id INTEGER NOT NULL,
+                status TEXT CHECK(status IN ('pending','accepted','declined'))
+                       DEFAULT 'pending',
+                created_at REAL,
+                FOREIGN KEY(sender_id) REFERENCES users(id),
+                FOREIGN KEY(receiver_id) REFERENCES users(id)
+            )
+        """)
 
     # --------------------------------------------------
-    # MATCHES (ACTIVE / ENDED)
+    # MATCHES
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS matches (
@@ -116,7 +143,7 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # MESSAGES (FUTURE CHAT)
+    # MESSAGES (FUTURE)
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -131,7 +158,7 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # REVIEWS / TRUST EVENTS (FUTURE)
+    # REVIEWS (FUTURE)
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS reviews (
@@ -150,23 +177,17 @@ def init_db():
     conn.close()
 
 # ======================================================
-# CLI COMMAND
+# CLI
 # ======================================================
 @click.command("init-db")
 def init_db_command():
     init_db()
     click.echo(f"Initialized database at {_get_db_path()}")
 
-# ======================================================
-# APP HOOK
-# ======================================================
 def init_app(app):
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
 
-# ======================================================
-# MANUAL RUN
-# ======================================================
 if __name__ == "__main__":
     init_db()
     print("Database initialized at:", _get_db_path())
