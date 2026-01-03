@@ -337,36 +337,45 @@ function showFeedbackResult(rating, comment) {
 // ==========================
 // SUBMIT FEEDBACK
 // ==========================
-async function submitFeedback() {
+function submitFeedback() {
   const comment = document.getElementById("feedback-text").value.trim();
+  const rating = selectedRating;
 
-  if (!selectedRating) {
+  if (!rating) {
     alert("Select a rating");
     return;
   }
 
-  if (comment.split(/\s+/).length > 50) {
-    alert("Max 50 words allowed");
+  if (!feedbackTargetId) {
+    alert("No feedback target found");
     return;
   }
 
-  const res = await fetch("/api/submit_feedback", {
+  fetch("/api/submit_feedback", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      reviewed_id: feedbackTargetId,
-      rating: selectedRating,
-      comment
+      reviewed_id: feedbackTargetId, // ✅ REQUIRED
+      rating: rating,
+      comment: comment
     })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === "submitted") {
+      alert("Feedback submitted");
+      feedbackTargetId = null;
+      showFeedbackResult(rating, comment);
+    } else {
+      alert("Failed to submit feedback");
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Server error");
   });
-
-  if (!res.ok) {
-    const err = await res.json();
-    alert(err.error || "Error");
-    return;
-  }
-
-  showFeedbackResult(selectedRating, comment);
 }
 
 // ==========================
