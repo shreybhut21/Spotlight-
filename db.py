@@ -46,9 +46,9 @@ def init_db():
             password_hash TEXT NOT NULL,
 
             gender TEXT,
-            dob TEXT,              -- YYYY-MM-DD
+            dob TEXT,
             bio TEXT,
-            vibe_tags TEXT,        -- comma-separated
+            vibe_tags TEXT,
 
             trust_score INTEGER DEFAULT 100,
             avatar_level INTEGER DEFAULT 1,
@@ -132,7 +132,7 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # REVIEWS (🔥 FIXED)
+    # REVIEWS ✅ FIXED (NO match_id)
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS reviews (
