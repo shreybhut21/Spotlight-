@@ -418,17 +418,26 @@ def submit_feedback():
     if "user_id" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    data = request.json
+    data = request.json or {}
     reviewer_id = session["user_id"]
     reviewed_id = data.get("reviewed_id")
     rating = data.get("rating")
-    comment = data.get("comment")
+    comment = data.get("comment", "")
+
+    # 🔥 HARD VALIDATION
+    if not reviewed_id or not rating:
+        return jsonify({"error": "missing_data"}), 400
 
     conn = db.get_db_connection()
+
     conn.execute(
-        "INSERT INTO reviews (reviewer_id, reviewed_id, rating, comment, created_at) VALUES (?, ?, ?, ?, ?)",
+        """
+        INSERT INTO reviews (reviewer_id, reviewed_id, rating, comment, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
         (reviewer_id, reviewed_id, rating, comment, time.time())
     )
+
     conn.commit()
     return jsonify({"status": "submitted"})
 
