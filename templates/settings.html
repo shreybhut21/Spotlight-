@@ -3,27 +3,159 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>My Profile</title>
+
+  <style>
+    body {
+      background: #050505;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .settings-container {
+      max-width: 520px;
+      margin: auto;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      color: #ccc;
+    }
+
+    .label {
+      color: #888;
+    }
+
+    .vibes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .vibe {
+      background: #222;
+      border: 1px solid #333;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+
+    .primary {
+      background: #d4af37;
+      color: #000;
+    }
+
+    .secondary {
+      background: #222;
+      color: #fff;
+      border: 1px solid #333;
+    }
+
+    .feedback {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-top: 6px;
+    }
+  </style>
 </head>
 <body>
 
-  <div class="settings-container">
-    <h2>Account Settings</h2>
+<div class="settings-container">
+  <h2>My Profile</h2>
 
-    <div class="settings-card">
-      <p><strong>Username:</strong> {{ user.username }}</p>
-      <p><strong>Trust Score:</strong> {{ user.trust_score }}</p>
-    </div>
-
-    <button class="primary-btn" onclick="location.href='/logout'">
-      Logout
-    </button>
-
-    <button class="secondary-btn" onclick="history.back()">
-      Back
-    </button>
+  <!-- BASIC INFO -->
+  <div class="card">
+    <div class="row"><span class="label">Username</span><span>{{ user.username }}</span></div>
+    <div class="row"><span class="label">Gender</span><span>{{ user.gender or '-' }}</span></div>
+    <div class="row"><span class="label">Age</span><span id="ageBox">—</span></div>
+    <div class="row"><span class="label">Trust Score</span><span>{{ user.trust_score }}</span></div>
   </div>
+
+  <!-- BIO -->
+  <div class="card">
+    <div class="label">About Me</div>
+    <p style="margin-top:8px;color:#ccc;">
+      {{ user.bio or "No bio added yet." }}
+    </p>
+  </div>
+
+  <!-- VIBES -->
+  <div class="card">
+    <div class="label">My Vibes</div>
+    <div class="vibes">
+      {% if user.vibe_tags %}
+        {% for v in user.vibe_tags.split(',') %}
+          <span class="vibe">{{ v }}</span>
+        {% endfor %}
+      {% else %}
+        <span class="vibe">No vibes selected</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- FEEDBACK -->
+  <div class="card">
+    <div class="label">Community Feedback</div>
+    <div id="feedbackBox" class="feedback">Loading feedback…</div>
+  </div>
+
+  <button class="btn primary" onclick="location.href='/index.html'">Back to Map</button>
+  <button class="btn secondary" onclick="location.href='/logout'">Logout</button>
+</div>
+
+<script>
+  // -------- AGE CALC --------
+  const dob = "{{ user.dob or '' }}";
+  if (dob) {
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    document.getElementById("ageBox").innerText = age;
+  } else {
+    document.getElementById("ageBox").innerText = "-";
+  }
+
+  // -------- FEEDBACK --------
+  fetch("/api/my_feedback")
+    .then(r => r.json())
+    .then(data => {
+      const box = document.getElementById("feedbackBox");
+      if (!data.count) {
+        box.innerText = "No feedback yet";
+        return;
+      }
+      box.innerText = `⭐ ${data.average}/10 from ${data.count} people`;
+    });
+</script>
 
 </body>
 </html>
