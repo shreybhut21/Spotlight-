@@ -44,26 +44,46 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+
+            -- profile info
             gender TEXT,
+            dob TEXT,              -- YYYY-MM-DD
+            bio TEXT,
+            vibe_tags TEXT,        -- comma-separated
+
+            -- system
             trust_score INTEGER DEFAULT 100,
             avatar_level INTEGER DEFAULT 1,
-            vibe_tags TEXT,
             avatar_url TEXT,
             is_active INTEGER DEFAULT 1,
+
+            -- match state
+            is_matched INTEGER DEFAULT 0,
+            matched_with INTEGER,
+
             created_at REAL
         )
     """)
 
     user_cols = [r["name"] for r in c.execute("PRAGMA table_info(users)")]
 
-    if "is_matched" not in user_cols:
-        c.execute("ALTER TABLE users ADD COLUMN is_matched INTEGER DEFAULT 0")
+    def add_col(name, sql):
+        if name not in user_cols:
+            c.execute(sql)
 
-    if "matched_with" not in user_cols:
-        c.execute("ALTER TABLE users ADD COLUMN matched_with INTEGER")
+    add_col("gender", "ALTER TABLE users ADD COLUMN gender TEXT")
+    add_col("dob", "ALTER TABLE users ADD COLUMN dob TEXT")
+    add_col("bio", "ALTER TABLE users ADD COLUMN bio TEXT")
+    add_col("vibe_tags", "ALTER TABLE users ADD COLUMN vibe_tags TEXT")
+    add_col("trust_score", "ALTER TABLE users ADD COLUMN trust_score INTEGER DEFAULT 100")
+    add_col("avatar_level", "ALTER TABLE users ADD COLUMN avatar_level INTEGER DEFAULT 1")
+    add_col("avatar_url", "ALTER TABLE users ADD COLUMN avatar_url TEXT")
+    add_col("is_active", "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+    add_col("is_matched", "ALTER TABLE users ADD COLUMN is_matched INTEGER DEFAULT 0")
+    add_col("matched_with", "ALTER TABLE users ADD COLUMN matched_with INTEGER")
 
     # --------------------------------------------------
-    # SPOTLIGHTS (LIVE USERS)
+    # SPOTLIGHTS
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS spotlights (
@@ -82,7 +102,7 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # REQUESTS (AUTO-FIX LEGACY SCHEMA)
+    # REQUESTS
     # --------------------------------------------------
     try:
         existing_req_cols = [r["name"] for r in c.execute("PRAGMA table_info(requests)")]
@@ -90,7 +110,6 @@ def init_db():
         existing_req_cols = []
 
     if "spotlight_id" in existing_req_cols:
-        # rebuild legacy table
         c.execute("ALTER TABLE requests RENAME TO _requests_old")
 
         c.execute("""
@@ -128,7 +147,7 @@ def init_db():
         """)
 
     # --------------------------------------------------
-    # MATCHES (ONE ROW PER MATCH)
+    # MATCHES
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS matches (
@@ -145,7 +164,7 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # REVIEWS / FEEDBACK (⭐ OUT OF 10)
+    # REVIEWS
     # --------------------------------------------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS reviews (
@@ -163,7 +182,7 @@ def init_db():
         )
     """)
 
-    # helpful indexes (performance + safety)
+    # Indexes
     c.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed ON reviews(reviewed_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_matches_users ON matches(user1_id, user2_id)")
 
