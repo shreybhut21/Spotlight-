@@ -1,374 +1,389 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join Spotlight</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotlight | Join the Map</title>
 
-    <style>
-        :root {
-            --card: #1a1a1a;
-            --muted: #888;
-            --gold: #d4af37;
-            --gold-hover: #b5952f;
-            --bg: #050505;
-            --input-bg: #0a0a0a;
-            --border: #333;
-        }
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
 
-        * { box-sizing: border-box; }
+<!-- Icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-        body {
-            background-color: var(--bg);
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            overflow-x: hidden; /* Prevent horizontal scroll during flip */
-        }
+<style>
+:root{
+  --gold:#d4af37;
+  --gold-glow:rgba(212,175,55,.35);
+  --bg:#050505;
+  --glass:rgba(18,18,18,.78);
+  --border:rgba(255,255,255,.12);
+  --muted:#a0a0a0;
+}
 
-        /* --- Back Button --- */
-        .back-home {
-            position: absolute;
-            top: 25px;
-            left: 25px;
-            color: var(--muted);
-            text-decoration: none;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 30px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: 0.3s ease;
-            z-index: 10;
-        }
-        .back-home:hover {
-            color: var(--gold);
-            border-color: var(--gold);
-            background: rgba(212, 175, 55, 0.1);
-        }
+*{box-sizing:border-box}
 
-        /* --- Wrapper & Flip Logic --- */
-        .auth-wrapper {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            perspective: 1000px; /* Essential for 3D flip */
-        }
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
 
-        .auth-flip {
-            position: relative;
-            width: 100%;
-            max-width: 440px;
-            transform-style: preserve-3d;
-            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            /* Grid trick to make sure height adjusts to the tallest card */
-            display: grid;
-            grid-template-columns: 1fr;
-        }
+body{
+  background:var(--bg);
+  color:#fff;
+  font-family:'Outfit',sans-serif;
+}
 
-        .auth-flip.flipped {
-            transform: rotateY(-180deg);
-        }
+/* ===== BACKGROUND ===== */
+.bg{
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size:40px 40px;
+  z-index:-3;
+}
 
-        .auth-card {
-            background: var(--card);
-            padding: 40px;
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.08);
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
-            
-            /* Positioning logic */
-            grid-row: 1;
-            grid-column: 1;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
+.glow{
+  position:fixed;
+  top:-35%;
+  left:50%;
+  transform:translateX(-50%);
+  width:650px;
+  height:650px;
+  background:radial-gradient(circle,var(--gold-glow),transparent 65%);
+  filter:blur(130px);
+  z-index:-2;
+}
 
-        /* --- KEY FIX: POINTER EVENTS --- */
-        /* This prevents clicking the form that is currently hidden behind */
-        .auth-front { 
-            transform: rotateY(0deg); 
-            z-index: 2; 
-        }
-        .auth-back { 
-            transform: rotateY(180deg); 
-            z-index: 1; 
-            /* By default, back is hidden, so disable clicks */
-            pointer-events: none; 
-        }
+/* ===== HERO ===== */
+.hero{
+  position:absolute;
+  top:7%;
+  width:100%;
+  text-align:center;
+  z-index:2;
+}
 
-        /* When flipped, swap interaction logic */
-        .auth-flip.flipped .auth-front { 
-            pointer-events: none; 
-        }
-        .auth-flip.flipped .auth-back { 
-            pointer-events: auto; 
-        }
+.hero h1{
+  font-family:'Playfair Display',serif;
+  font-size:2.7rem;
+  margin:0;
+}
 
-        /* --- Typography & Inputs --- */
-        h2 { 
-            margin: 0 0 8px; 
-            font-size: 2rem;
-            color: white;
-            letter-spacing: -0.5px;
-        }
-        p { 
-            color: var(--muted); 
-            font-size: 0.95rem; 
-            margin-bottom: 30px;
-            line-height: 1.5;
-        }
+.hero p{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:.95rem;
+}
 
-        .form-group { margin-bottom: 20px; }
-        .form-row { display: flex; gap: 15px; } 
+/* ===== CENTER ===== */
+.wrap{
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  perspective:1200px;
+}
 
-        label {
-            font-size: 0.85rem;
-            color: var(--muted);
-            margin-bottom: 8px;
-            display: block;
-            font-weight: 500;
-        }
+/* ===== FLIP ===== */
+.flip{
+  width:100%;
+  max-width:440px;
+  height:580px; /* ⬅️ increased */
+  position:relative;
+  transform-style:preserve-3d;
+  transition:transform .85s cubic-bezier(.2,.8,.2,1);
+}
 
-        input, select, textarea {
-            width: 100%;
-            padding: 14px 16px;
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: white;
-            outline: none;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
+.flip.flipped{transform:rotateY(-180deg)}
 
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--gold);
-            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
-        }
+/* ===== CARD ===== */
+.card{
+  position:absolute;
+  inset:0;
+  background:var(--glass);
+  border:1px solid var(--border);
+  border-radius:28px;
+  padding:38px;
+  backdrop-filter:blur(22px);
+  box-shadow:0 30px 60px rgba(0,0,0,.75);
+  backface-visibility:hidden;
+  display:flex;
+  flex-direction:column;
+}
 
-        textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+.card-content{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
 
-        /* --- Vibe Selection (Chips) --- */
-        .vibe-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .vibe-checkbox { display: none; }
-        
-        .vibe-label {
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #ccc;
-            user-select: none;
-        }
+.backside{transform:rotateY(180deg)}
 
-        .vibe-label:hover { border-color: var(--gold); }
+/* ===== SHAKE ===== */
+.card.shake{animation:shake .45s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  50%{transform:translateX(6px)}
+  75%{transform:translateX(-4px)}
+}
 
-        .vibe-checkbox:checked + .vibe-label {
-            background: var(--gold);
-            color: #000;
-            border-color: var(--gold);
-            font-weight: 600;
-        }
+/* ===== TYPO ===== */
+h2{
+  margin:0;
+  font-family:'Playfair Display',serif;
+  font-size:2.2rem;
+  text-align:center;
+}
 
-        /* --- Buttons --- */
-        .main-btn {
-            width: 100%;
-            background: var(--gold);
-            color: #000;
-            border: none;
-            padding: 16px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            margin-top: 10px;
-        }
-        .main-btn:hover { background: var(--gold-hover); transform: translateY(-2px); }
-        .main-btn:active { transform: translateY(0); }
+.subtitle{
+  text-align:center;
+  color:var(--muted);
+  margin:10px 0 24px;
+  font-size:.9rem;
+}
 
-        .toggle-text {
-            text-align: center;
-            margin-top: 25px;
-            font-size: 0.9rem;
-            color: var(--muted);
-        }
+/* ===== INPUTS ===== */
+.group{margin-bottom:14px}
 
-        /* Make sure this acts like a button but isn't a link */
-        .toggle-link {
-            color: var(--gold);
-            cursor: pointer;
-            font-weight: 600;
-            margin-left: 5px;
-            text-decoration: underline;
-            text-decoration-color: transparent;
-            transition: text-decoration-color 0.3s;
-        }
-        .toggle-link:hover { text-decoration-color: var(--gold); }
+label{
+  font-size:.72rem;
+  text-transform:uppercase;
+  color:var(--gold);
+  font-weight:600;
+  margin-bottom:6px;
+  display:block;
+}
 
-        /* --- Error Box --- */
-        .error-box {
-            background: rgba(255, 80, 80, 0.1);
-            border: 1px solid rgba(255, 80, 80, 0.3);
-            color: #ff8080;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-    </style>
+input,select{
+  width:100%;
+  padding:13px 15px;
+  border-radius:14px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:#fff;
+  font-size:.9rem;
+}
+
+input:focus,select:focus{
+  outline:none;
+  border-color:var(--gold);
+  box-shadow:0 0 0 2px rgba(212,175,55,.15);
+}
+
+.row{display:flex;gap:12px}
+
+/* ===== VIBES (FIXED) ===== */
+.vibes{display:flex;flex-wrap:wrap;gap:8px}
+.vibes input{display:none}
+
+.vibe{
+  border:1px solid var(--border);
+  padding:7px 14px;
+  border-radius:999px;
+  font-size:.82rem;
+  color:var(--muted);
+  cursor:pointer;
+  transition:.25s;
+}
+
+.vibe:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 10px var(--gold-glow);
+}
+
+.vibes input:checked + .vibe{
+  background:var(--gold);
+  color:#000;
+  border-color:var(--gold);
+  font-weight:600;
+}
+
+/* ===== BUTTON ===== */
+.btn{
+  width:100%;
+  padding:15px;
+  border-radius:999px;
+  background:var(--gold);
+  border:none;
+  font-weight:700;
+  cursor:pointer;
+  transition:.25s;
+  margin-top:10px;
+}
+
+.btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 20px var(--gold-glow);
+}
+
+/* ===== OAUTH ===== */
+.oauth{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:16px;
+}
+
+.oauth-btn{
+  padding:11px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#000;
+  color:#fff;
+  font-size:.83rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.oauth-btn:hover{
+  border-color:var(--gold);
+  box-shadow:0 0 10px var(--gold-glow);
+}
+
+/* ===== TOGGLE ===== */
+.toggle{
+  text-align:center;
+  margin-top:18px;
+  font-size:.88rem;
+  color:var(--muted);
+}
+
+.toggle span{
+  color:#fff;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.toggle span:hover{color:var(--gold)}
+</style>
 </head>
+
 <body>
+<div class="bg"></div>
+<div class="glow"></div>
 
-<a href="/" class="back-home"><i class="fas fa-arrow-left"></i> Home</a>
+<!-- HERO -->
+<div class="hero">
+  <h1>Join the Map</h1>
+  <p>Meet with intent, not swipes.</p>
+</div>
 
-<div class="auth-wrapper">
-    
-    <div class="auth-flip {{ 'flipped' if show_signup else '' }}" id="authFlip">
+<div class="wrap">
+<div class="flip {{ 'flipped' if show_signup else '' }}" id="flip">
 
-        <div class="auth-card auth-front">
-            <h2>Welcome Back</h2>
-            <p>Log in to connect with your vibe.</p>
+<!-- LOGIN -->
+<div class="card">
+  <div class="card-content">
+    <h2>Spotlight</h2>
+    <p class="subtitle">See who’s nearby right now</p>
 
-            {% if error and not show_signup %}
-            <div class="error-box">
-                <i class="fas fa-exclamation-circle"></i> {{ error }}
-            </div>
-            {% endif %}
-
-            <form action="/login" method="POST">
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" placeholder="Enter your username" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="Enter your password" required>
-                </div>
-
-                <button class="main-btn">Login</button>
-            </form>
-
-            <div class="toggle-text">
-                New here? <span class="toggle-link" onclick="flipCard()">Create account</span>
-            </div>
-        </div>
-
-        <div class="auth-card auth-back">
-            <h2>Create Account</h2>
-            <p>Tell the world who you are.</p>
-
-            {% if error and show_signup %}
-            <div class="error-box">
-                <i class="fas fa-exclamation-circle"></i> {{ error }}
-            </div>
-            {% endif %}
-
-            <form action="/signup" method="POST" onsubmit="return validateAge()">
-                
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" placeholder="Pick a unique username" required>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Gender</label>
-                        <select name="gender" required>
-                            <option value="" disabled selected>Select</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>Date of Birth</label>
-                        <input type="date" name="dob" id="dob" required style="color-scheme: dark;">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Your Vibes (Select all that apply)</label>
-                    <div class="vibe-container">
-                        <input type="checkbox" id="vibe1" name="vibes" value="Chill" class="vibe-checkbox">
-                        <label for="vibe1" class="vibe-label">☕ Chill</label>
-
-                        <input type="checkbox" id="vibe2" name="vibes" value="DeepTalks" class="vibe-checkbox">
-                        <label for="vibe2" class="vibe-label">🗣 Deep Talks</label>
-
-                        <input type="checkbox" id="vibe3" name="vibes" value="Exploring" class="vibe-checkbox">
-                        <label for="vibe3" class="vibe-label">🌍 Exploring</label>
-
-                        <input type="checkbox" id="vibe4" name="vibes" value="LateNights" class="vibe-checkbox">
-                        <label for="vibe4" class="vibe-label">🌙 Late Nights</label>
-
-                        <input type="checkbox" id="vibe5" name="vibes" value="Music" class="vibe-checkbox">
-                        <label for="vibe5" class="vibe-label">🎵 Music</label>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>About You</label>
-                    <textarea name="bio" maxlength="300" placeholder="Short bio..." rows="2"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="Create a strong password" required>
-                </div>
-
-                <button type="submit" class="main-btn">Sign Up</button>
-            </form>
-
-            <div class="toggle-text">
-                Already registered? <span class="toggle-link" onclick="flipCard()">Log in</span>
-            </div>
-        </div>
-
+    <div class="oauth">
+      <div class="oauth-btn"><i class="fab fa-google"></i> Google</div>
+      <div class="oauth-btn"><i class="fab fa-apple"></i> Apple</div>
     </div>
+
+    <form action="/login" method="POST">
+      <div class="group">
+        <label>Username</label>
+        <input name="username" required>
+      </div>
+      <div class="group">
+        <label>Password</label>
+        <input type="password" name="password" required>
+      </div>
+      <button class="btn">Enter the Map</button>
+    </form>
+
+    <div class="toggle">New here? <span onclick="flip()">Create account</span></div>
+  </div>
+</div>
+
+<!-- SIGNUP -->
+<div class="card backside">
+  <div class="card-content">
+    <h2>Create Profile</h2>
+    <p class="subtitle">Your intent. Your location.</p>
+
+    <form action="/signup" method="POST" onsubmit="return validateAge()">
+      <div class="group">
+        <label>Username</label>
+        <input name="username" required>
+      </div>
+
+      <div class="row">
+        <div class="group" style="flex:1">
+          <label>Gender</label>
+          <select name="gender" required>
+            <option disabled selected>Select</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="group" style="flex:1">
+          <label>Birth Date</label>
+          <input type="date" id="dob" name="dob" required style="color-scheme:dark">
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Your Vibes</label>
+        <div class="vibes">
+          <input id="v1" type="checkbox" name="vibes" value="Chill">
+          <label class="vibe" for="v1">☕ Chill</label>
+
+          <input id="v2" type="checkbox" name="vibes" value="DeepTalks">
+          <label class="vibe" for="v2">💬 Deep</label>
+
+          <input id="v3" type="checkbox" name="vibes" value="Exploring">
+          <label class="vibe" for="v3">🌍 Explore</label>
+
+          <input id="v4" type="checkbox" name="vibes" value="Drinks">
+          <label class="vibe" for="v4">🍸 Drinks</label>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Password</label>
+        <input type="password" name="password" required>
+      </div>
+
+      <button class="btn">Join Spotlight</button>
+    </form>
+
+    <div class="toggle">Already here? <span onclick="flip()">Log in</span></div>
+  </div>
+</div>
+
+</div>
 </div>
 
 <script>
-    function flipCard() {
-        document.getElementById("authFlip").classList.toggle("flipped");
-    }
-
-    function validateAge() {
-        const dob = document.getElementById("dob").value;
-        if (!dob) return false;
-
-        const birth = new Date(dob);
-        const today = new Date();
-        let age = today.getFullYear() - birth.getFullYear();
-        const m = today.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-            age--;
-        }
-
-        if (age < 18) {
-            alert("You must be at least 18 years old to join Spotlight.");
-            return false;
-        }
-        return true;
-    }
+function flip(){
+  document.getElementById("flip").classList.toggle("flipped")
+}
+function validateAge(){
+  const d=document.getElementById("dob").value;
+  if(!d)return false;
+  const b=new Date(d),t=new Date();
+  let a=t.getFullYear()-b.getFullYear();
+  if(t.getMonth()<b.getMonth()||(t.getMonth()==b.getMonth()&&t.getDate()<b.getDate()))a--;
+  if(a<18){alert("You must be 18+ to join Spotlight.");return false;}
+  return true;
+}
 </script>
-
 </body>
 </html>
