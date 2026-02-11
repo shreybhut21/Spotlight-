@@ -1,14 +1,14 @@
 {
   "builds": [
     {
-      "src": "spotlight_app/main.py",
+      "src": "app.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "spotlight_app/main.py"
+      "dest": "app.py"
     }
   ]
 }
