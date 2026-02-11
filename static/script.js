@@ -7,6 +7,7 @@ let myLon = null;
 let userMarker = null;
 let nearbyMarkers = [];
 let selectedUserId = null;
+let nearbyUsers = [];
 let currentRequestId = null;
 let locationReady = false;
 let requestPoller = null;
@@ -24,15 +25,44 @@ let lastPositions = [];
 const MAX_POINTS = 5;
 let hasFirstFix = false;
 
+// simple view toggler with explicit display control (prevents stuck overlays)
+function showSection(sectionId) {
+  ["app-shell", "match-view", "feedback-view"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isTarget = id === sectionId;
+    el.classList.toggle("hidden", !isTarget);
+    if (isTarget) {
+      // match view uses flex, others block
+      el.style.display = id === "match-view" ? "flex" : "block";
+    } else {
+      el.style.display = "none";
+    }
+  });
+}
+
 // ==========================
 // INIT
 // ==========================
 document.addEventListener("DOMContentLoaded", () => {
+  // force-hide match/feedback overlays on load in case of cached state
+  const mv = document.getElementById("match-view");
+  const fv = document.getElementById("feedback-view");
+  const app = document.getElementById("app-shell");
+  if (mv) { mv.classList.add("hidden"); mv.style.display = "none"; }
+  if (fv) { fv.classList.add("hidden"); fv.style.display = "none"; }
+  if (app) { app.classList.remove("hidden"); app.style.display = "block"; }
+
   initMap();
   fetchUserInfo();
-  requestPoller = setInterval(pollRequests, 5000);
+  startRequestPoller();
   startMatchPoller();
 });
+
+function startRequestPoller() {
+  if (requestPoller) return;
+  requestPoller = setInterval(pollRequests, 5000);
+}
 
 // ==========================
 // MAP INIT
@@ -152,11 +182,16 @@ async function fetchNearbyUsers() {
   if (!res.ok) return;
 
   const users = await res.json();
+  nearbyUsers = users.map(u => ({
+    ...u,
+    vibes: u.vibe_tags ? u.vibe_tags.split(",").filter(Boolean) : [],
+    distance_km: (u.lat && u.lon) ? haversine(myLat, myLon, u.lat, u.lon) : null
+  }));
 
   nearbyMarkers.forEach(m => map.removeLayer(m));
   nearbyMarkers = [];
 
-  users.forEach(user => {
+  nearbyUsers.forEach(user => {
     const icon = L.divIcon({
       html: `<div style="width:60px;height:60px;border-radius:50%;
         background:rgba(255,215,0,0.25);
@@ -169,6 +204,8 @@ async function fetchNearbyUsers() {
     marker.on("click", () => openProfile(user));
     nearbyMarkers.push(marker);
   });
+
+  renderNearbyCards();
 }
 
 // ==========================
@@ -176,8 +213,38 @@ async function fetchNearbyUsers() {
 // ==========================
 function openProfile(user) {
   selectedUserId = user.id;
+  document.getElementById("p-avatar").innerText = user.username?.[0] || "?";
   document.getElementById("p-username").innerText = user.username;
   document.getElementById("p-score").innerText = user.trust_score ?? "--";
+  document.getElementById("p-place").innerText = user.place || "—";
+  document.getElementById("p-intent").innerText = user.intent || "—";
+  document.getElementById("p-time").innerText = user.meet_time || "Now";
+  const dist = user.distance_km;
+  document.getElementById("p-distance").innerText = dist ? `${dist.toFixed(1)} km away` : "";
+
+  const clueWrap = document.getElementById("p-clue-wrap");
+  if (user.clue) {
+    clueWrap.classList.remove("hidden");
+    document.getElementById("p-clue").innerText = `👀 ${user.clue}`;
+  } else {
+    clueWrap.classList.add("hidden");
+  }
+
+  const bioWrap = document.getElementById("p-bio-wrap");
+  if (user.bio) {
+    bioWrap.classList.remove("hidden");
+    document.getElementById("p-bio").innerText = user.bio;
+  } else {
+    bioWrap.classList.add("hidden");
+  }
+
+  const vibesWrap = document.getElementById("p-vibes-wrap");
+  if (user.vibes && user.vibes.length) {
+    vibesWrap.classList.remove("hidden");
+    vibesWrap.innerHTML = user.vibes.map(v => `<span class="profile-chip">${v}</span>`).join("");
+  } else {
+    vibesWrap.classList.add("hidden");
+  }
   openSheet("profile-sheet");
 }
 
@@ -198,6 +265,28 @@ async function sendRequest() {
 }
 
 // ==========================
+// REPORT USER
+// ==========================
+async function reportUser() {
+  if (!selectedUserId) {
+    alert("No user selected");
+    return;
+  }
+  const message = prompt("Why are you reporting this user? (optional)") || "";
+  const res = await fetch("/api/report_user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_id: selectedUserId, message })
+  });
+  if (!res.ok) {
+    if (res.status === 401) { alert("Please sign in to report."); return; }
+    alert("Unable to submit report");
+    return;
+  }
+  alert("Report submitted");
+}
+
+// ==========================
 // REQUESTS
 // ==========================
 async function pollRequests() {
@@ -210,15 +299,25 @@ async function pollRequests() {
   if (data.type !== "incoming") return;
 
   currentRequestId = data.data.id;
-  document.getElementById("bell-dot").classList.remove("hidden");
-  document.getElementById("bellContent").innerHTML = `
-    <strong>${data.data.username}</strong>
-    <p>Wants to meet you</p>
-    <div class="action-row">
-      <button onclick="respondRequest('accept')" class="primary-btn">Accept</button>
-      <button onclick="respondRequest('decline')" class="secondary-btn">Decline</button>
-    </div>
-  `;
+  const bellBox = document.getElementById("bellBox");
+  const dot = document.getElementById("bell-dot");
+  if (dot) dot.classList.remove("hidden");
+  if (bellBox) {
+    bellBox.classList.remove("hidden");
+    bellBox.innerHTML = `
+      <div class="notif-item">
+        <div class="notif-avatar">${data.data.username[0]}</div>
+        <div class="notif-text">
+          <div class="name">${data.data.username}</div>
+          <div class="msg">wants to meet you</div>
+        </div>
+        <div class="notif-actions">
+          <button class="accept-btn" onclick="respondRequest('accept')"><i class="fas fa-check"></i></button>
+          <button class="decline-btn" onclick="respondRequest('decline')"><i class="fas fa-xmark"></i></button>
+        </div>
+      </div>
+    `;
+  }
 }
 
 // ==========================
@@ -245,37 +344,45 @@ function enterMatchMode() {
   if (isMatched) return;
 
   isMatched = true;
-  clearInterval(requestPoller);
+  clearInterval(requestPoller); requestPoller = null;
   clearInterval(matchPoller);
+
+  // ensure overlays/sheets are closed so clicks aren't blocked
+  closeAllSheets();
+  const ov = document.getElementById("overlay");
+  if (ov) {
+    ov.classList.remove("active");
+    ov.classList.add("hidden");
+  }
 
   nearbyMarkers.forEach(m => map.removeLayer(m));
   nearbyMarkers = [];
 
-  document.body.innerHTML = `
-    <div style="height:100vh;display:flex;align-items:center;
-      justify-content:center;flex-direction:column;
-      background:#000;color:gold;padding:20px;text-align:center;">
-      <h2>✨ Match Mode ✨</h2>
-      <p>You are matched 🎉</p>
-      <button onclick="endMatch()" class="primary-btn">End Match</button>
-    </div>
-  `;
+  showSection("match-view");
 }
 
 // ==========================
 // END MATCH → FEEDBACK
 // ==========================
 async function endMatch() {
-  await fetch("/api/end_match", { method: "POST" });
-
-  const res = await fetch("/api/feedback_target");
-  if (!res.ok) {
-    window.location.reload();
+  const resEnd = await fetch("/api/end_match", { method: "POST" });
+  const endPayload = await resEnd.json().catch(() => ({}));
+  if (!resEnd.ok) {
+    alert(endPayload.error || "Unable to end match");
     return;
   }
 
-  const target = await res.json();
+  const res = await fetch("/api/feedback_target");
+  const target = await res.json().catch(() => ({}));
+  if (!res.ok || target.error || !target.id) {
+    // No ended match to rate; just reset UI
+    isMatched = false;
+    backToMap();
+    return;
+  }
+
   feedbackTargetId = target.id;
+  isMatched = false;
   showFeedbackUI(target.username);
 }
 
@@ -283,54 +390,41 @@ async function endMatch() {
 // FEEDBACK UI
 // ==========================
 function showFeedbackUI(username) {
-  document.body.innerHTML = `
-    <div style="min-height:100vh;background:#000;color:#fff;
-      display:flex;flex-direction:column;justify-content:center;
-      align-items:center;padding:20px;text-align:center;">
+  showSection("feedback-view");
+  selectedRating = 0;
+  const nameEl = document.getElementById("feedback-username");
+  if (nameEl) nameEl.innerText = `@${username}`;
 
-      <h2>⭐ Rate Your Match ⭐</h2>
-      <p>@${username}</p>
-
-      <div id="rating-box" style="margin:15px;">
-        ${[1,2,3,4,5,6,7,8,9,10].map(n =>
-          `<button class="rate-btn" onclick="selectRating(${n}, this)">${n}</button>`
-        ).join("")}
-      </div>
-
-      <textarea id="feedback-text"
-        placeholder="Write up to 50 words"
-        style="width:90%;max-width:400px;height:80px;"></textarea>
-
-      <button onclick="submitFeedback()" class="primary-btn"
-        style="margin-top:15px;">Submit</button>
-    </div>
-  `;
+  const ratingBox = document.getElementById("rating-box");
+  if (ratingBox) {
+    ratingBox.innerHTML = [1,2,3,4,5,6,7,8,9,10].map(n =>
+      `<button class="rate-btn" onclick="selectRating(${n}, this)">${n}</button>`
+    ).join("");
+  }
 }
 
 function selectRating(n, el) {
   selectedRating = n;
   document.querySelectorAll(".rate-btn").forEach(b => {
-    b.style.background = "#222";
+    b.classList.remove("selected");
   });
-  el.style.background = "gold";
+  el.classList.add("selected");
 }
 
 // ==========================
 // FEEDBACK RESULT (VIEW)
 // ==========================
 function showFeedbackResult(rating, comment) {
-  document.body.innerHTML = `
-    <div style="min-height:100vh;background:#000;color:#fff;
-      display:flex;flex-direction:column;justify-content:center;
-      align-items:center;padding:20px;text-align:center;">
+  const card = document.querySelector("#feedback-view .feedback-card");
+  if (!card) return window.location.reload();
 
-      <h2>✅ Feedback Submitted</h2>
-      <p>Your rating: <strong>${rating}/10</strong></p>
-      ${comment ? `<p style="max-width:400px;margin-top:10px;">"${comment}"</p>` : ""}
-      <button onclick="window.location.reload()" class="primary-btn" style="margin-top:20px;">
-        Continue
-      </button>
-    </div>
+  card.innerHTML = `
+    <h2>✅ Feedback Submitted</h2>
+    <p>Your rating: <strong>${rating}/10</strong></p>
+    ${comment ? `<p style="max-width:400px;margin-top:10px;">"${comment}"</p>` : ""}
+    <button onclick="finishFeedback()" class="primary-btn" style="margin-top:20px;">
+      Continue
+    </button>
   `;
 }
 
@@ -378,11 +472,22 @@ function submitFeedback() {
   });
 }
 
+function finishFeedback() {
+  selectedRating = 0;
+  startRequestPoller();
+  startMatchPoller();
+  fetchNearbyUsers();
+  fetchUserInfo();
+  showSection("app-shell");
+}
+
 // ==========================
 // UI HELPERS
 // ==========================
 function openSheet(id) {
-  document.getElementById("overlay").classList.remove("hidden");
+  const ov = document.getElementById("overlay");
+  ov.classList.remove("hidden");
+  requestAnimationFrame(() => ov.classList.add("active"));
   setTimeout(() => document.getElementById(id).classList.add("active"), 10);
 }
 
@@ -390,7 +495,9 @@ function closeAllSheets() {
   document.querySelectorAll(".bottom-sheet").forEach(s =>
     s.classList.remove("active")
   );
-  setTimeout(() => document.getElementById("overlay").classList.add("hidden"), 300);
+  const ov = document.getElementById("overlay");
+  ov.classList.remove("active");
+  setTimeout(() => ov.classList.add("hidden"), 300);
 }
 async function fetchMyFeedback() {
   const res = await fetch("/api/my_feedback");
@@ -398,11 +505,12 @@ async function fetchMyFeedback() {
     alert("Unable to load feedback");
     return;
   }
-  myFeedbackList = await res.json();
+  const payload = await res.json();
+  myFeedbackList = payload.reviews || [];
   showMyFeedbackUI();
 }
 function showMyFeedbackUI() {
-  if (!myFeedbackList.length) {
+  if (!myFeedbackList || myFeedbackList.length === 0) {
     document.body.innerHTML = `
       <div style="min-height:100vh;background:#000;color:#fff;
         display:flex;flex-direction:column;justify-content:center;
@@ -449,6 +557,34 @@ function goToSettings() {
 function toggleBellBox() {
   const box = document.getElementById('bellBox');
   if (box) box.classList.toggle('hidden');
+}
+
+function backToMap() {
+  showSection("app-shell");
+  if (!isMatched) {
+    startRequestPoller();
+    startMatchPoller();
+    fetchNearbyUsers();
+  }
+}
+
+// ==========================
+// REPORT APP (feedback to admin)
+// ==========================
+async function reportApp() {
+  const message = prompt("Describe the issue or feedback:") || "";
+  if (!message.trim()) return;
+  const res = await fetch("/api/report_app", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message })
+  });
+  if (!res.ok) {
+    if (res.status === 401) { alert("Please sign in to send a report."); return; }
+    alert("Unable to send report");
+    return;
+  }
+  alert("Thanks! Report sent.");
 }
 
 // ==========================
@@ -505,4 +641,46 @@ async function turnOffSpotlight() {
   }
 
   document.getElementById("live-indicator").classList.add("hidden");
+}
+
+// ==========================
+// NEARBY CARDS
+// ==========================
+function renderNearbyCards() {
+  const el = document.getElementById("nearby-carousel");
+  if (!el) return;
+
+  if (!nearbyUsers || nearbyUsers.length === 0) {
+    el.innerHTML = "";
+    return;
+  }
+
+  el.innerHTML = nearbyUsers.map(u => `
+    <div class="nearby-card" onclick='openProfile(${JSON.stringify(u).replace(/'/g, "\\'")})'>
+      <div class="card-top">
+        <div class="card-avatar">${u.username?.[0] || "?"}</div>
+        <div>
+          <div class="card-name">${u.username}</div>
+          <div class="card-score"><i class="fas fa-star" style="font-size:10px"></i> ${u.trust_score ?? "--"}</div>
+        </div>
+      </div>
+      <div class="card-info"><i class="fas fa-map-pin"></i> ${u.place || "Somewhere nearby"}</div>
+      <div class="card-info"><i class="fas fa-mug-hot"></i> ${u.intent || "Hanging out"}</div>
+      ${u.bio ? `<div class="card-bio">${u.bio.slice(0, 80)}${u.bio.length > 80 ? "…" : ""}</div>` : ""}
+      <div class="card-dist"><span>${u.distance_km ? `${u.distance_km.toFixed(1)} km` : "Nearby"}</span><i class="fas fa-chevron-right" style="font-size:10px;color:rgba(255,215,0,0.4)"></i></div>
+    </div>
+  `).join("");
+}
+
+// ==========================
+// UTIL – distance
+// ==========================
+function haversine(lat1, lon1, lat2, lon2) {
+  const toRad = deg => deg * Math.PI / 180;
+  const R = 6371; // km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 }
