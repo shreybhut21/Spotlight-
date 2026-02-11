@@ -96,14 +96,18 @@
     <div class="row"><span class="label">Gender</span><span>{{ user.gender or '-' }}</span></div>
     <div class="row"><span class="label">Age</span><span id="ageBox">—</span></div>
     <div class="row"><span class="label">Trust Score</span><span>{{ user.trust_score }}</span></div>
+    <div class="row"><span class="label">Phone</span><span>{{ user.phone or '-' }}</span></div>
   </div>
 
   <!-- BIO -->
   <div class="card">
     <div class="label">About Me</div>
-    <p style="margin-top:8px;color:#ccc;">
-      {{ user.bio or "No bio added yet." }}
-    </p>
+    <textarea id="bioInput" maxlength="280" style="width:100%;margin-top:8px;min-height:110px;background:#111;border:1px solid #333;color:#eee;border-radius:12px;padding:10px;font-family:inherit;">{{ user.bio or "" }}</textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;color:#888;font-size:12px;">
+      <span id="bioHelper">Write a short intro.</span>
+      <span id="bioCount">0/280</span>
+    </div>
+    <button class="btn primary" style="margin-top:12px" onclick="saveBio()">Save Bio</button>
   </div>
 
   <!-- VIBES -->
@@ -155,6 +159,37 @@
       }
       box.innerText = `⭐ ${data.average}/10 from ${data.count} people`;
     });
+
+  // -------- BIO SAVE --------
+  const bioInput = document.getElementById("bioInput");
+  const bioCount = document.getElementById("bioCount");
+  const bioHelper = document.getElementById("bioHelper");
+
+  function updateCount() {
+    const len = bioInput.value.length;
+    bioCount.innerText = `${len}/280`;
+  }
+  updateCount();
+  bioInput.addEventListener("input", updateCount);
+
+  window.saveBio = async function () {
+    const bio = bioInput.value.trim();
+    if (bio.length > 280) {
+      alert("Bio too long");
+      return;
+    }
+    const res = await fetch("/api/update_bio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bio })
+    });
+    if (!res.ok) {
+      alert("Could not save bio");
+      return;
+    }
+    bioHelper.innerText = "Saved!";
+    setTimeout(() => bioHelper.innerText = "Write a short intro.", 2000);
+  };
 </script>
 
 </body>
