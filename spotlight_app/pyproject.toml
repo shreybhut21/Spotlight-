@@ -1,0 +1,2 @@
+[tool.vercel]
+entrypoint = "spotlight_app/main.py"
