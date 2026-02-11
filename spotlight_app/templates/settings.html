@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile</title>
+
+  <style>
+    body {
+      background: #050505;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .settings-container {
+      max-width: 520px;
+      margin: auto;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      color: #ccc;
+    }
+
+    .label {
+      color: #888;
+    }
+
+    .vibes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .vibe {
+      background: #222;
+      border: 1px solid #333;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+
+    .primary {
+      background: #d4af37;
+      color: #000;
+    }
+
+    .secondary {
+      background: #222;
+      color: #fff;
+      border: 1px solid #333;
+    }
+
+    .feedback {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="settings-container">
+  <h2>My Profile</h2>
+
+  <!-- BASIC INFO -->
+  <div class="card">
+    <div class="row"><span class="label">Username</span><span>{{ user.username }}</span></div>
+    <div class="row"><span class="label">Gender</span><span>{{ user.gender or '-' }}</span></div>
+    <div class="row"><span class="label">Age</span><span id="ageBox">—</span></div>
+    <div class="row"><span class="label">Trust Score</span><span>{{ user.trust_score }}</span></div>
+    <div class="row"><span class="label">Phone</span><span>{{ user.phone or '-' }}</span></div>
+  </div>
+
+  <!-- BIO -->
+  <div class="card">
+    <div class="label">About Me</div>
+    <textarea id="bioInput" maxlength="280" style="width:100%;margin-top:8px;min-height:110px;background:#111;border:1px solid #333;color:#eee;border-radius:12px;padding:10px;font-family:inherit;">{{ user.bio or "" }}</textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;color:#888;font-size:12px;">
+      <span id="bioHelper">Write a short intro.</span>
+      <span id="bioCount">0/280</span>
+    </div>
+    <button class="btn primary" style="margin-top:12px" onclick="saveBio()">Save Bio</button>
+  </div>
+
+  <!-- VIBES -->
+  <div class="card">
+    <div class="label">My Vibes</div>
+    <div class="vibes">
+      {% if user.vibe_tags %}
+        {% for v in user.vibe_tags.split(',') %}
+          <span class="vibe">{{ v }}</span>
+        {% endfor %}
+      {% else %}
+        <span class="vibe">No vibes selected</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- FEEDBACK -->
+  <div class="card">
+    <div class="label">Community Feedback</div>
+    <div id="feedbackBox" class="feedback">Loading feedback…</div>
+  </div>
+
+  <button class="btn primary" onclick="location.href='/index.html'">Back to Map</button>
+  <button class="btn secondary" onclick="location.href='/logout'">Logout</button>
+</div>
+
+<script>
+  // -------- AGE CALC --------
+  const dob = "{{ user.dob or '' }}";
+  if (dob) {
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    document.getElementById("ageBox").innerText = age;
+  } else {
+    document.getElementById("ageBox").innerText = "-";
+  }
+
+  // -------- FEEDBACK --------
+  fetch("/api/my_feedback")
+    .then(r => r.json())
+    .then(data => {
+      const box = document.getElementById("feedbackBox");
+      if (!data.count) {
+        box.innerText = "No feedback yet";
+        return;
+      }
+      box.innerText = `⭐ ${data.average}/10 from ${data.count} people`;
+    });
+
+  // -------- BIO SAVE --------
+  const bioInput = document.getElementById("bioInput");
+  const bioCount = document.getElementById("bioCount");
+  const bioHelper = document.getElementById("bioHelper");
+
+  function updateCount() {
+    const len = bioInput.value.length;
+    bioCount.innerText = `${len}/280`;
+  }
+  updateCount();
+  bioInput.addEventListener("input", updateCount);
+
+  window.saveBio = async function () {
+    const bio = bioInput.value.trim();
+    if (bio.length > 280) {
+      alert("Bio too long");
+      return;
+    }
+    const res = await fetch("/api/update_bio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bio })
+    });
+    if (!res.ok) {
+      alert("Could not save bio");
+      return;
+    }
+    bioHelper.innerText = "Saved!";
+    setTimeout(() => bioHelper.innerText = "Write a short intro.", 2000);
+  };
+</script>
+
+</body>
+</html>

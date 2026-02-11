@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotlight | Join the Map</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+
+<!-- Icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+<style>
+:root{
+  --gold:#d4af37;
+  --gold-glow:rgba(212,175,55,.35);
+  --bg:#050505;
+  --glass:rgba(18,18,18,.78);
+  --border:rgba(255,255,255,.12);
+  --muted:#a0a0a0;
+}
+
+*{box-sizing:border-box}
+
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+}
+
+body{
+  background:var(--bg);
+  color:#fff;
+  font-family:'Outfit',sans-serif;
+  overflow-y:auto; /* allow natural flow; no card clipping */
+}
+
+/* ===== BACKGROUND ===== */
+.bg{
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size:40px 40px;
+  z-index:-3;
+}
+
+.glow{
+  position:fixed;
+  top:-35%;
+  left:50%;
+  transform:translateX(-50%);
+  width:650px;
+  height:650px;
+  background:radial-gradient(circle,var(--gold-glow),transparent 65%);
+  filter:blur(130px);
+  z-index:-2;
+}
+
+/* ===== HERO ===== */
+.hero{
+  position:absolute;
+  top:7%;
+  width:100%;
+  text-align:center;
+  z-index:1;
+  pointer-events:none;
+}
+
+.hero h1{
+  font-family:'Playfair Display',serif;
+  font-size:2.7rem;
+  margin:0;
+}
+
+.hero p{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:.95rem;
+}
+
+/* ===== CENTER ===== */
+.wrap{
+  min-height:100vh;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:48px 16px 32px;
+  perspective:1200px;
+  position:relative;
+  z-index:3;
+}
+
+/* ===== FLIP ===== */
+.flip{
+  width:100%;
+  max-width:440px;
+  height:820px; /* register view */
+  position:relative;
+  transform-style:preserve-3d;
+  transition:transform .85s cubic-bezier(.2,.8,.2,1);
+  transition-property: transform, height;
+}
+
+.flip:not(.flipped){
+  height:640px; /* compact login height */
+}
+
+.flip.flipped{transform:rotateY(-180deg)}
+
+/* ===== CARD ===== */
+.card{
+  position:absolute;
+  inset:0;
+  background:var(--glass);
+  border:1px solid var(--border);
+  border-radius:28px;
+  padding:38px;
+  backdrop-filter:blur(22px);
+  box-shadow:0 30px 60px rgba(0,0,0,.75);
+  backface-visibility:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.card-content{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  justify-content:center;
+}
+
+.backside{transform:rotateY(180deg)}
+
+/* ===== SHAKE ===== */
+.card.shake{animation:shake .45s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  50%{transform:translateX(6px)}
+  75%{transform:translateX(-4px)}
+}
+
+/* ===== TYPO ===== */
+h2{
+  margin:0;
+  font-family:'Playfair Display',serif;
+  font-size:2.2rem;
+  text-align:center;
+}
+
+.subtitle{
+  text-align:center;
+  color:var(--muted);
+  margin:10px 0 24px;
+  font-size:.9rem;
+}
+
+/* ===== INPUTS ===== */
+.group{margin-bottom:14px}
+
+label{
+  font-size:.72rem;
+  text-transform:uppercase;
+  color:var(--gold);
+  font-weight:600;
+  margin-bottom:6px;
+  display:block;
+}
+
+input,select{
+  width:100%;
+  padding:13px 15px;
+  border-radius:14px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:#fff;
+  font-size:.9rem;
+}
+
+textarea{
+  width:100%;
+  padding:13px 15px;
+  border-radius:14px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:#fff;
+  font-size:.9rem;
+  min-height:110px;
+  resize:vertical;
+}
+
+input:focus,select:focus,textarea:focus{
+  outline:none;
+  border-color:var(--gold);
+  box-shadow:0 0 0 2px rgba(212,175,55,.15);
+}
+
+.row{display:flex;gap:12px}
+
+/* ===== VIBES (FIXED) ===== */
+.vibes{display:flex;flex-wrap:wrap;gap:8px}
+.vibes input{display:none}
+
+.vibe{
+  border:1px solid var(--border);
+  padding:7px 14px;
+  border-radius:999px;
+  font-size:.82rem;
+  color:var(--muted);
+  cursor:pointer;
+  transition:.25s;
+}
+
+.vibe:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 10px var(--gold-glow);
+}
+
+.vibes input:checked + .vibe{
+  background:var(--gold);
+  color:#000;
+  border-color:var(--gold);
+  font-weight:600;
+}
+
+/* ===== BUTTON ===== */
+.btn{
+  width:100%;
+  padding:15px;
+  border-radius:999px;
+  background:var(--gold);
+  border:none;
+  font-weight:700;
+  cursor:pointer;
+  transition:.25s;
+  margin-top:10px;
+}
+
+.btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 20px var(--gold-glow);
+}
+
+/* ===== OAUTH ===== */
+.oauth{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:16px;
+}
+
+.oauth-btn{
+  padding:11px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#000;
+  color:#fff;
+  font-size:.83rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.oauth-btn:hover{
+  border-color:var(--gold);
+  box-shadow:0 0 10px var(--gold-glow);
+}
+
+/* ===== TOGGLE ===== */
+.toggle{
+  text-align:center;
+  margin-top:18px;
+  font-size:.88rem;
+  color:var(--muted);
+}
+
+.toggle span{
+  color:#fff;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.toggle span:hover{color:var(--gold)}
+</style>
+</head>
+
+<body>
+<div class="bg"></div>
+<div class="glow"></div>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Join the Map</h1>
+  <p>Meet with intent, not swipes.</p>
+</div>
+
+<div class="wrap">
+<div class="flip {{ 'flipped' if show_signup else '' }}" id="flip">
+
+<!-- LOGIN -->
+<div class="card">
+  <div class="card-content">
+    <h2>Spotlight</h2>
+    <p class="subtitle">See who’s nearby right now</p>
+
+    <div class="oauth">
+      <div class="oauth-btn"><i class="fab fa-google"></i> Google</div>
+      <div class="oauth-btn"><i class="fab fa-apple"></i> Apple</div>
+    </div>
+
+    <form action="/login" method="POST">
+      <div class="group">
+        <label>Username</label>
+        <input name="username" required>
+      </div>
+      <div class="group">
+        <label>Password</label>
+        <input type="password" name="password" required>
+      </div>
+      <button class="btn">Enter the Map</button>
+    </form>
+
+    <div class="toggle">New here? <span onclick="flip()">Create account</span></div>
+  </div>
+</div>
+
+<!-- SIGNUP -->
+<div class="card backside">
+  <div class="card-content">
+    <h2>Create Profile</h2>
+    <p class="subtitle">Your intent. Your location.</p>
+
+    <form action="/signup" method="POST" onsubmit="return validateAge()">
+      <div class="group">
+        <label>Username</label>
+        <input name="username" required>
+      </div>
+
+      <div class="row">
+        <div class="group" style="flex:1">
+          <label>Gender</label>
+          <select name="gender" required>
+            <option disabled selected>Select</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="group" style="flex:1">
+          <label>Birth Date</label>
+          <input type="date" id="dob" name="dob" required style="color-scheme:dark">
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Your Vibes</label>
+        <div class="vibes">
+          <input id="v1" type="checkbox" name="vibes" value="Chill">
+          <label class="vibe" for="v1">☕ Chill</label>
+
+          <input id="v2" type="checkbox" name="vibes" value="DeepTalks">
+          <label class="vibe" for="v2">💬 Deep</label>
+
+          <input id="v3" type="checkbox" name="vibes" value="Exploring">
+          <label class="vibe" for="v3">🌍 Explore</label>
+
+          <input id="v4" type="checkbox" name="vibes" value="Drinks">
+          <label class="vibe" for="v4">🍸 Drinks</label>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Phone</label>
+        <input type="tel" name="phone" pattern="\+?[0-9\-\s]{7,20}" placeholder="+1 555 123 4567" required>
+      </div>
+
+      <div class="group">
+        <label>Bio</label>
+        <textarea name="bio" maxlength="280" placeholder="Share a short intro (max 280 chars)"></textarea>
+      </div>
+
+      <div class="group">
+        <label>Password</label>
+        <input type="password" name="password" required>
+      </div>
+
+      <button class="btn">Join Spotlight</button>
+    </form>
+
+    <div class="toggle">Already here? <span onclick="flip()">Log in</span></div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+function flip(){
+  document.getElementById("flip").classList.toggle("flipped")
+}
+function validateAge(){
+  const d=document.getElementById("dob").value;
+  if(!d)return false;
+  const b=new Date(d),t=new Date();
+  let a=t.getFullYear()-b.getFullYear();
+  if(t.getMonth()<b.getMonth()||(t.getMonth()==b.getMonth()&&t.getDate()<b.getDate()))a--;
+  if(a<18){alert("You must be 18+ to join Spotlight.");return false;}
+  return true;
+}
+</script>
+</body>
+</html>
