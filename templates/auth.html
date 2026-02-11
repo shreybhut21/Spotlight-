@@ -29,13 +29,13 @@ html,body{
   margin:0;
   width:100%;
   height:100%;
-  overflow:hidden;
 }
 
 body{
   background:var(--bg);
   color:#fff;
   font-family:'Outfit',sans-serif;
+  overflow-y:auto; /* allow natural flow; no card clipping */
 }
 
 /* ===== BACKGROUND ===== */
@@ -67,7 +67,8 @@ body{
   top:7%;
   width:100%;
   text-align:center;
-  z-index:2;
+  z-index:1;
+  pointer-events:none;
 }
 
 .hero h1{
@@ -84,21 +85,29 @@ body{
 
 /* ===== CENTER ===== */
 .wrap{
-  height:100%;
+  min-height:100vh;
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:center;
+  padding:48px 16px 32px;
   perspective:1200px;
+  position:relative;
+  z-index:3;
 }
 
 /* ===== FLIP ===== */
 .flip{
   width:100%;
   max-width:440px;
-  height:580px; /* ⬅️ increased */
+  height:820px; /* register view */
   position:relative;
   transform-style:preserve-3d;
   transition:transform .85s cubic-bezier(.2,.8,.2,1);
+  transition-property: transform, height;
+}
+
+.flip:not(.flipped){
+  height:640px; /* compact login height */
 }
 
 .flip.flipped{transform:rotateY(-180deg)}
@@ -122,6 +131,7 @@ body{
   flex:1;
   display:flex;
   flex-direction:column;
+  gap:12px;
   justify-content:center;
 }
 
@@ -173,7 +183,19 @@ input,select{
   font-size:.9rem;
 }
 
-input:focus,select:focus{
+textarea{
+  width:100%;
+  padding:13px 15px;
+  border-radius:14px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:#fff;
+  font-size:.9rem;
+  min-height:110px;
+  resize:vertical;
+}
+
+input:focus,select:focus,textarea:focus{
   outline:none;
   border-color:var(--gold);
   box-shadow:0 0 0 2px rgba(212,175,55,.15);
@@ -354,6 +376,16 @@ input:focus,select:focus{
           <input id="v4" type="checkbox" name="vibes" value="Drinks">
           <label class="vibe" for="v4">🍸 Drinks</label>
         </div>
+      </div>
+
+      <div class="group">
+        <label>Phone</label>
+        <input type="tel" name="phone" pattern="\+?[0-9\-\s]{7,20}" placeholder="+1 555 123 4567" required>
+      </div>
+
+      <div class="group">
+        <label>Bio</label>
+        <textarea name="bio" maxlength="280" placeholder="Share a short intro (max 280 chars)"></textarea>
       </div>
 
       <div class="group">
