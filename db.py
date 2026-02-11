@@ -49,6 +49,7 @@ def init_db():
             dob TEXT,
             bio TEXT,
             vibe_tags TEXT,
+            phone TEXT,
 
             trust_score INTEGER DEFAULT 100,
             avatar_level INTEGER DEFAULT 1,
@@ -78,6 +79,7 @@ def init_db():
     add_col("is_active", "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
     add_col("is_matched", "ALTER TABLE users ADD COLUMN is_matched INTEGER DEFAULT 0")
     add_col("matched_with", "ALTER TABLE users ADD COLUMN matched_with INTEGER")
+    add_col("phone", "ALTER TABLE users ADD COLUMN phone TEXT")
 
     # --------------------------------------------------
     # SPOTLIGHTS
@@ -163,24 +165,70 @@ def init_db():
     """)
 
     # --------------------------------------------------
-    # REVIEWS ✅ FIXED (NO match_id)
+    # REVIEWS (migrate legacy score -> rating)
     # --------------------------------------------------
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS reviews (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            reviewer_id INTEGER NOT NULL,
-            reviewed_id INTEGER NOT NULL,
-            rating INTEGER CHECK(rating BETWEEN 1 AND 10),
-            comment TEXT,
-            created_at REAL,
-            FOREIGN KEY(reviewer_id) REFERENCES users(id),
-            FOREIGN KEY(reviewed_id) REFERENCES users(id)
-        )
-    """)
+    try:
+        review_cols = [r["name"] for r in c.execute("PRAGMA table_info(reviews)")]
+    except sqlite3.OperationalError:
+        review_cols = []
+
+    if review_cols and "score" in review_cols and "rating" not in review_cols:
+        # legacy table used `score`; rebuild with `rating`
+        c.execute("ALTER TABLE reviews RENAME TO _reviews_old")
+        c.execute("""
+            CREATE TABLE reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reviewer_id INTEGER NOT NULL,
+                reviewed_id INTEGER NOT NULL,
+                rating INTEGER CHECK(rating BETWEEN 1 AND 10),
+                comment TEXT,
+                created_at REAL,
+                FOREIGN KEY(reviewer_id) REFERENCES users(id),
+                FOREIGN KEY(reviewed_id) REFERENCES users(id)
+            )
+        """)
+        c.execute("""
+            INSERT INTO reviews (id, reviewer_id, reviewed_id, rating, comment, created_at)
+            SELECT id, reviewer_id, reviewed_id, score, comment, created_at
+            FROM _reviews_old
+        """)
+        c.execute("DROP TABLE _reviews_old")
+    else:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reviewer_id INTEGER NOT NULL,
+                reviewed_id INTEGER NOT NULL,
+                rating INTEGER CHECK(rating BETWEEN 1 AND 10),
+                comment TEXT,
+                created_at REAL,
+                FOREIGN KEY(reviewer_id) REFERENCES users(id),
+                FOREIGN KEY(reviewed_id) REFERENCES users(id)
+            )
+        """)
 
     # Indexes
     c.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed ON reviews(reviewed_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_requests_receiver ON requests(receiver_id)")
+
+    # --------------------------------------------------
+    # REPORTS (user reports + app feedback)
+    # --------------------------------------------------
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reporter_id INTEGER,
+            target_user_id INTEGER,
+            type TEXT CHECK(type IN ('user','app')),
+            message TEXT,
+            status TEXT DEFAULT 'open',
+            created_at REAL,
+            FOREIGN KEY(reporter_id) REFERENCES users(id),
+            FOREIGN KEY(target_user_id) REFERENCES users(id)
+        )
+    """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_reports_type ON reports(type)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_reports_target ON reports(target_user_id)")
 
     conn.commit()
     conn.close()
